@@ -1,4 +1,4 @@
-// ─── SIDEBAR MOBILE ───
+// ─── NAVIGATION ───
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
   document.getElementById('overlay').classList.toggle('active');
@@ -8,9 +8,6 @@ function closeSidebar() {
   document.getElementById('overlay').classList.remove('active');
 }
 
-// ─── NAVIGATION ───
-
-
 function showPage(name, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -19,11 +16,13 @@ function showPage(name, el) {
   closeSidebar();
   loadPage(name);
 }
-if (name === 'dashboard') loadDashboard();
-if (name === 'doubts') loadDoubts();
-if (name === 'students') loadStudents();
-if (name === 'tasks') loadTasks();
-if (name === 'fees') loadFees();
+
+function loadPage(name) {
+  if (name === 'dashboard') loadDashboard();
+  if (name === 'doubts') loadDoubts();
+  if (name === 'students') loadStudents();
+  if (name === 'tasks') loadTasks();
+  if (name === 'fees') loadFees();
 }
 
 async function doLogout() {
@@ -88,14 +87,12 @@ function openAnswerModal(id, question) {
 
 function searchOnChatGPT() {
   const question = document.getElementById('doubt-question-display').textContent.replace(/^"|"$/g, '');
-  const url = 'https://chatgpt.com/?q=' + encodeURIComponent(question);
-  window.open(url, '_blank');
+  window.open('https://chatgpt.com/?q=' + encodeURIComponent(question), '_blank');
 }
 
 function searchOnGoogle() {
   const question = document.getElementById('doubt-question-display').textContent.replace(/^"|"$/g, '');
-  const url = 'https://www.google.com/search?q=' + encodeURIComponent(question);
-  window.open(url, '_blank');
+  window.open('https://www.google.com/search?q=' + encodeURIComponent(question), '_blank');
 }
 
 async function submitAnswer() {
@@ -322,7 +319,6 @@ async function toggleFee(studentId, month, year) {
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 function escHtml(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
-// Close modal on overlay click
 document.querySelectorAll('.modal-overlay').forEach(m => {
   m.addEventListener('click', e => { if (e.target === m) m.style.display = 'none'; });
 });
