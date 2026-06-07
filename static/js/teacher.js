@@ -1,18 +1,29 @@
+// ─── SIDEBAR MOBILE ───
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('overlay').classList.toggle('active');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('overlay').classList.remove('active');
+}
+
 // ─── NAVIGATION ───
+
+
 function showPage(name, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
   if (el) el.classList.add('active');
+  closeSidebar();
   loadPage(name);
 }
-
-function loadPage(name) {
-  if (name === 'dashboard') loadDashboard();
-  if (name === 'doubts') loadDoubts();
-  if (name === 'students') loadStudents();
-  if (name === 'tasks') loadTasks();
-  if (name === 'fees') loadFees();
+if (name === 'dashboard') loadDashboard();
+if (name === 'doubts') loadDoubts();
+if (name === 'students') loadStudents();
+if (name === 'tasks') loadTasks();
+if (name === 'fees') loadFees();
 }
 
 async function doLogout() {
@@ -74,14 +85,17 @@ function openAnswerModal(id, question) {
   document.getElementById('doubt-answer').value = '';
   document.getElementById('modal-answer').style.display = 'flex';
 }
+
 function searchOnChatGPT() {
   const question = document.getElementById('doubt-question-display').textContent.replace(/^"|"$/g, '');
-  window.open('https://chatgpt.com/?q=' + encodeURIComponent(question), '_blank');
+  const url = 'https://chatgpt.com/?q=' + encodeURIComponent(question);
+  window.open(url, '_blank');
 }
 
 function searchOnGoogle() {
   const question = document.getElementById('doubt-question-display').textContent.replace(/^"|"$/g, '');
-  window.open('https://www.google.com/search?q=' + encodeURIComponent(question), '_blank');
+  const url = 'https://www.google.com/search?q=' + encodeURIComponent(question);
+  window.open(url, '_blank');
 }
 
 async function submitAnswer() {

@@ -1,12 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Student – ShikshaSetu</title>
-<link rel="stylesheet" href="/static/css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student – ShikshaSetu</title>
+  <link rel="stylesheet" href="/static/css/style.css">
 </head>
-<body class="app-body student-theme">
+
+<!-- HAMBURGER -->
+<button class="hamburger" id="hamburger" onclick="toggleSidebar()">☰</button>
+<div class="sidebar-overlay" id="overlay" onclick="closeSidebar()"></div>
 
 <aside class="sidebar student-sidebar" id="sidebar">
   <div class="sidebar-logo"><span>🎓</span> ShikshaSetu</div>
@@ -41,14 +45,16 @@
         <div class="stat-label">PENDING TASKS</div>
         <div class="stat-value" id="stu-pending-tasks">–</div>
         <div id="stu-completed-tasks" style="color:#2ecc71;font-size:14px"></div>
-        <button class="btn-dark" style="margin-top:12px;font-size:13px;padding:8px 16px" onclick="showPage('assignments',document.querySelector('[data-page=assignments]'))">View All</button>
+        <button class="btn-dark" style="margin-top:12px;font-size:13px;padding:8px 16px"
+          onclick="showPage('assignments',document.querySelector('[data-page=assignments]'))">View All</button>
       </div>
       <div class="stat-card">
         <div class="stat-icon green">💼</div>
         <div class="stat-label">FEES STATUS</div>
         <div class="stat-value" id="stu-fees-status" style="color:#e74c3c">–</div>
         <div id="stu-fees-due" style="color:#666;font-size:14px"></div>
-        <button class="btn-outline-small" style="margin-top:12px" onclick="showPage('fees',document.querySelector('[data-page=fees]'))">History</button>
+        <button class="btn-outline-small" style="margin-top:12px"
+          onclick="showPage('fees',document.querySelector('[data-page=fees]'))">History</button>
       </div>
     </div>
     <div class="quote-banner">
@@ -83,7 +89,8 @@
           </div>
           <div class="form-group">
             <label>Your Question</label>
-            <textarea id="doubt-question" rows="6" placeholder="Type your doubt here in detail..." style="width:100%;padding:12px;border:1px solid #ddd;border-radius:10px;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
+            <textarea id="doubt-question" rows="6" placeholder="Type your doubt here in detail..."
+              style="width:100%;padding:12px;border:1px solid #ddd;border-radius:10px;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
           </div>
           <div id="doubt-err" class="error-msg"></div>
           <div id="doubt-succ" class="success-msg"></div>
@@ -109,9 +116,15 @@
     <p style="color:#666;margin-bottom:24px">Track your monthly tuition payments here.</p>
     <div class="table-wrap">
       <table class="data-table">
-        <thead><tr>
-          <th>MONTH</th><th>YEAR</th><th>STATUS</th><th>ACTION</th><th>AMOUNT</th>
-        </tr></thead>
+        <thead>
+          <tr>
+            <th>MONTH</th>
+            <th>YEAR</th>
+            <th>STATUS</th>
+            <th>ACTION</th>
+            <th>AMOUNT</th>
+          </tr>
+        </thead>
         <tbody id="fees-tbody-student"></tbody>
       </table>
     </div>
@@ -121,4 +134,5 @@
 
 <script src="/static/js/student.js"></script>
 </body>
+
 </html>

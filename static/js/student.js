@@ -1,9 +1,28 @@
+// ─── SIDEBAR MOBILE ───
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('overlay').classList.toggle('active');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('overlay').classList.remove('active');
+}
+
 // ─── NAVIGATION ───
 function showPage(name, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
   if (el) el.classList.add('active');
+  loadPage(name);
+}
+
+function showPage(name, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  if (el) el.classList.add('active');
+  closeSidebar();
   loadPage(name);
 }
 
@@ -88,7 +107,7 @@ async function submitDoubt() {
 
   const res = await fetch('/api/student/doubts', {
     method: 'POST',
-    headers: {'Content-Type':'application/json'},
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ subject, question })
   });
   const d = await res.json();
@@ -115,7 +134,7 @@ async function loadAssignments() {
     const statusBadge = a.status === 'completed'
       ? '<span class="assignment-status-completed">COMPLETED</span>'
       : '<span class="assignment-status-pending">PENDING</span>';
-    const date = new Date(a.created_at).toLocaleDateString('en-US', {month:'numeric',day:'numeric',year:'numeric'});
+    const date = new Date(a.created_at).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
     const studyMaterial = a.study_material
       ? `<a href="${a.study_material}" download="study_material" style="color:#2563eb;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">📥 Study Material</a>`
       : '';
@@ -183,7 +202,7 @@ async function markPaid(feeId) {
 }
 
 // ─── UTILS ───
-function escHtml(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escHtml(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
 // Init
 loadDashboard();
