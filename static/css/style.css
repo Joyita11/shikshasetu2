@@ -9,6 +9,9 @@
 
 body {
   font-family: 'Segoe UI', system-ui, sans-serif;
+  /* FIX: any horizontal overflow causes mobile browsers to zoom out to fit.
+     Hiding it here ensures the viewport stays at 1:1 scale. */
+  overflow-x: hidden;
 }
 
 a {
@@ -21,6 +24,8 @@ a {
   background: #0d0d2b;
   color: #fff;
   min-height: 100vh;
+  /* FIX: prevent hero/features sections from causing horizontal overflow */
+  overflow-x: hidden;
 }
 
 .landing-nav {
@@ -78,9 +83,12 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 80px 60px;
+  /* FIX: Use vw-based clamp so padding never causes horizontal overflow on small screens */
+  padding: clamp(24px, 6vw, 80px) clamp(16px, 5vw, 60px);
   gap: 40px;
   flex-wrap: wrap;
+  /* Prevent any child from causing horizontal scroll */
+  overflow-x: hidden;
 }
 
 .hero-left {
@@ -153,7 +161,8 @@ a {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 24px;
-  padding: 60px;
+  /* FIX: clamp prevents overflow on narrow screens */
+  padding: clamp(28px, 5vw, 60px) clamp(16px, 5vw, 60px);
   background: rgba(255, 255, 255, .03);
 }
 
@@ -306,6 +315,9 @@ a {
   display: flex;
   min-height: 100vh;
   background: #eef2f7;
+  /* FIX: prevent horizontal overflow which causes mobile browser to zoom out */
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 .sidebar {
@@ -406,6 +418,10 @@ a {
   flex: 1;
   padding: 32px 36px;
   min-height: 100vh;
+  /* FIX: constrain width so content never overflows and causes zoom-out */
+  min-width: 0;
+  max-width: calc(100vw - 260px);
+  overflow-x: hidden;
 }
 
 .page {
@@ -1145,6 +1161,9 @@ a {
   .main-content {
     margin-left: 0;
     padding: 72px 16px 32px;
+    /* FIX: on mobile, take full viewport width — no sidebar offset */
+    max-width: 100vw;
+    width: 100%;
   }
 
   /* Stats: 2 columns on mobile (better than 1) */
@@ -1359,5 +1378,73 @@ a {
 
   .main-content {
     padding: 68px 12px 24px;
+  }
+}
+
+/* ─── MOBILE FEE TABLE: card-style so it doesn't need horizontal scroll ─── */
+/* This makes the student fee status page look great on any phone size */
+@media (max-width: 700px) {
+
+  /* Hide normal table headers on the student fee page */
+  #fees-tbody-student,
+  #fees-tbody {
+    display: block;
+  }
+
+  /* Each fee row becomes a card */
+  #fees-tbody-student tr,
+  #fees-tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    background: #fff;
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .07);
+    gap: 8px;
+    align-items: center;
+    border: none;
+  }
+
+  /* Each cell becomes flex item with data-label as mini header */
+  #fees-tbody-student td,
+  #fees-tbody td {
+    display: flex;
+    flex-direction: column;
+    font-size: 14px;
+    padding: 0;
+    border: none;
+    flex: 1;
+    min-width: 80px;
+  }
+
+  /* data-label acts as the mini column name above the value */
+  #fees-tbody-student td::before,
+  #fees-tbody td::before {
+    content: attr(data-label);
+    font-size: 10px;
+    font-weight: 700;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 4px;
+  }
+
+  /* Make action button fill full width at bottom */
+  #fees-tbody-student td:nth-child(4),
+  #fees-tbody td:nth-child(4) {
+    flex: 100%;
+    margin-top: 4px;
+  }
+
+  #fees-tbody-student td:nth-child(4) .btn-mark-paid,
+  #fees-tbody td:nth-child(4) .btn-mark-paid {
+    width: 100%;
+    text-align: center;
+  }
+
+  /* Hide the old table header row entirely on mobile */
+  .data-table thead {
+    display: none;
   }
 }

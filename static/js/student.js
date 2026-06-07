@@ -160,6 +160,8 @@ async function completeTask(itemId) {
 }
 
 // ─── FEES ───
+// FIX: Added data-label attributes to every <td> so the mobile card CSS
+// can display mini column headers above each value without a visible table header row.
 async function loadFees() {
   const res = await fetch('/api/student/fees');
   const fees = await res.json();
@@ -178,11 +180,11 @@ async function loadFees() {
       : `<button class="btn-mark-paid" onclick="markPaid(${f.id})">Mark as Paid</button>`;
     return `
     <tr>
-      <td>${escHtml(f.month)}</td>
-      <td>${f.year}</td>
-      <td>${statusBadge}</td>
-      <td>${actionBtn}</td>
-      <td>₹${Number(f.amount).toFixed(2)}</td>
+      <td data-label="Month">${escHtml(f.month)}</td>
+      <td data-label="Year">${f.year}</td>
+      <td data-label="Status">${statusBadge}</td>
+      <td data-label="Action">${actionBtn}</td>
+      <td data-label="Amount">₹${Number(f.amount).toFixed(2)}</td>
     </tr>`;
   }).join('');
 }

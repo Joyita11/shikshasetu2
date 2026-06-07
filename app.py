@@ -7,16 +7,19 @@ from datetime import datetime, timedelta
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'shikshasetu_secret_key_2026')
 
-# ── SESSION: stay logged in across deploys / browser restarts ──
+# ── SESSION: stay logged in for 30 days ──
 app.config['SESSION_PERMANENT'] = True
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['SESSION_COOKIE_SECURE'] = False  # set True if using HTTPS only
+# IMPORTANT: Keep False unless you have HTTPS on your custom domain.
+# Render's .onrender.com URLs use HTTPS, but setting True can cause issues
+# with the free tier's redirects. Leave False for now.
+app.config['SESSION_COOKIE_SECURE'] = False
 
 from whitenoise import WhiteNoise
 app.wsgi_app = WhiteNoise(app.wsgi_app, root='static/', prefix='static')
 
-# ── DB PATH: use /data on Render (persistent disk), fallback to local ──
+# ── DB PATH: /data on Render (persistent disk), local fallback ──
 DATA_DIR = '/data' if os.path.isdir('/data') else os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(DATA_DIR, 'shikshasetu.db')
 
@@ -98,10 +101,24 @@ def init_db():
 
 @app.route('/')
 def index():
+    # ── FIX: If already logged in, skip the landing page and go straight to dashboard ──
+    # This is why users were being asked to login every time — the landing page
+    # never checked the session, so users landed here after every browser open.
+    role = session.get('user_role')
+    if role == 'teacher':
+        return redirect('/teacher')
+    if role == 'student':
+        return redirect('/student')
     return render_template('landing.html')
 
 @app.route('/login', methods=['GET'])
 def login_page():
+    # If already logged in, redirect directly to dashboard
+    role = session.get('user_role')
+    if role == 'teacher':
+        return redirect('/teacher')
+    if role == 'student':
+        return redirect('/student')
     return render_template('login.html')
 
 @app.route('/signup', methods=['GET'])
@@ -141,8 +158,6 @@ def login():
     conn = get_db()
     c = conn.cursor()
 
-    # FIX: look up by email+password only, then check role separately
-    # so teacher-added students (role='student') can always log in
     user = c.execute(
         'SELECT * FROM users WHERE LOWER(email)=? AND password=?',
         (email, hash_password(password))
@@ -152,10 +167,10 @@ def login():
     if not user:
         return jsonify({'error': 'Invalid email or password'}), 401
     
-    # Role mismatch — tell user clearly instead of silent fail
     if user['role'] != role:
         return jsonify({'error': f'This account is registered as a {user["role"]}, not {role}'}), 401
 
+    # Set permanent session so it survives browser restarts
     session.permanent = True
     session['user_id']    = user['id']
     session['user_name']  = user['name']
@@ -235,13 +250,11 @@ def add_student():
     
     email = data.get('email', '').strip().lower()
     
-    # Create user account for student
     try:
         c.execute('INSERT INTO users (name, email, password, role) VALUES (?,?,?,?)',
                   (data['name'], email, hash_password(data.get('password','student123')), 'student'))
         student_user_id = c.lastrowid
     except sqlite3.IntegrityError:
-        # Email exists — only reuse if it's a student account
         existing = c.execute('SELECT id, role FROM users WHERE LOWER(email)=?', (email,)).fetchone()
         if existing and existing['role'] == 'student':
             student_user_id = existing['id']
