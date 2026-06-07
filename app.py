@@ -7,6 +7,9 @@ from datetime import datetime
 app = Flask(__name__)
 app.secret_key = 'shikshasetu_secret_key_2026'
 
+from whitenoise import WhiteNoise
+app.wsgi_app = WhiteNoise(app.wsgi_app, root='static/', prefix='static')
+
 DB_PATH = 'shikshasetu.db'
 
 def get_db():
