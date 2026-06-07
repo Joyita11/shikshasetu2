@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student – ShikshaSetu</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="app-body student-theme">
+
+<aside class="sidebar student-sidebar" id="sidebar">
+  <div class="sidebar-logo"><span>🎓</span> ShikshaSetu</div>
+  <nav class="sidebar-nav">
+    <a href="#" class="nav-item active" data-page="dashboard" onclick="showPage('dashboard',this)">
+      <span class="nav-icon">🏠</span> Dashboard
+    </a>
+    <a href="#" class="nav-item" data-page="doubts" onclick="showPage('doubts',this)">
+      <span class="nav-icon">💬</span> Post Doubts
+    </a>
+    <a href="#" class="nav-item" data-page="assignments" onclick="showPage('assignments',this)">
+      <span class="nav-icon">📄</span> Assignments
+    </a>
+    <a href="#" class="nav-item" data-page="fees" onclick="showPage('fees',this)">
+      <span class="nav-icon">💼</span> Due Fees
+    </a>
+  </nav>
+  <div class="sidebar-logout">
+    <a href="#" onclick="doLogout()" class="logout-btn">🔴 Logout</a>
+  </div>
+</aside>
+
+<main class="main-content">
+
+  <!-- DASHBOARD -->
+  <div id="page-dashboard" class="page active">
+    <h2 class="page-title" id="stu-greeting">Hello, Dreamer! 👋</h2>
+    <p style="color:#666;margin-bottom:24px">Stay focused and keep growing.</p>
+    <div class="stats-grid" style="grid-template-columns:1fr 1fr">
+      <div class="stat-card">
+        <div class="stat-icon yellow">⏳</div>
+        <div class="stat-label">PENDING TASKS</div>
+        <div class="stat-value" id="stu-pending-tasks">–</div>
+        <div id="stu-completed-tasks" style="color:#2ecc71;font-size:14px"></div>
+        <button class="btn-dark" style="margin-top:12px;font-size:13px;padding:8px 16px" onclick="showPage('assignments',document.querySelector('[data-page=assignments]'))">View All</button>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon green">💼</div>
+        <div class="stat-label">FEES STATUS</div>
+        <div class="stat-value" id="stu-fees-status" style="color:#e74c3c">–</div>
+        <div id="stu-fees-due" style="color:#666;font-size:14px"></div>
+        <button class="btn-outline-small" style="margin-top:12px" onclick="showPage('fees',document.querySelector('[data-page=fees]'))">History</button>
+      </div>
+    </div>
+    <div class="quote-banner">
+      <div style="font-size:48px;opacity:.3;line-height:1">"</div>
+      <p id="quote-text">"Your education is a dress rehearsal for a life that is yours to lead."</p>
+      <p id="quote-author" style="font-size:14px;opacity:.8">— Theodore Roosevelt</p>
+    </div>
+  </div>
+
+  <!-- POST DOUBTS -->
+  <div id="page-doubts" class="page">
+    <h2 class="page-title">Ask a Doubt 💡</h2>
+    <p style="color:#666;margin-bottom:24px">Don't let questions slow you down. Ask your teacher directly.</p>
+    <div style="display:flex;gap:24px;flex-wrap:wrap">
+      <div style="flex:1;min-width:300px">
+        <div class="card-white">
+          <div class="form-group">
+            <label>Subject</label>
+            <select id="doubt-subject">
+              <option value="">Select Subject</option>
+              <option>Mathematics</option>
+              <option>Science</option>
+              <option>English</option>
+              <option>Hindi</option>
+              <option>Social Studies</option>
+              <option>Computer Science</option>
+              <option>Physics</option>
+              <option>Chemistry</option>
+              <option>Biology</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Your Question</label>
+            <textarea id="doubt-question" rows="6" placeholder="Type your doubt here in detail..." style="width:100%;padding:12px;border:1px solid #ddd;border-radius:10px;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
+          </div>
+          <div id="doubt-err" class="error-msg"></div>
+          <div id="doubt-succ" class="success-msg"></div>
+          <button class="btn-dark full-width" onclick="submitDoubt()">✈ Submit Doubt</button>
+        </div>
+      </div>
+      <div style="flex:1;min-width:280px">
+        <h3 style="margin-bottom:16px">Recent Doubts</h3>
+        <div id="recent-doubts-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ASSIGNMENTS -->
+  <div id="page-assignments" class="page">
+    <h2 class="page-title">My Assignments 📚</h2>
+    <div id="assignments-list"></div>
+  </div>
+
+  <!-- DUE FEES -->
+  <div id="page-fees" class="page">
+    <h2 class="page-title">My Fee Status 💳</h2>
+    <p style="color:#666;margin-bottom:24px">Track your monthly tuition payments here.</p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr>
+          <th>MONTH</th><th>YEAR</th><th>STATUS</th><th>ACTION</th><th>AMOUNT</th>
+        </tr></thead>
+        <tbody id="fees-tbody-student"></tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<script src="/static/js/student.js"></script>
+</body>
+</html>

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teacher – ShikshaSetu</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body class="app-body">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo"><span>🎓</span> ShikshaSetu</div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-page="dashboard" onclick="showPage('dashboard',this)">
+        <span class="nav-icon">🏠</span> Dashboard
+      </a>
+      <a href="#" class="nav-item" data-page="doubts" onclick="showPage('doubts',this)">
+        <span class="nav-icon">❓</span> Solve Doubts
+      </a>
+      <a href="#" class="nav-item" data-page="students" onclick="showPage('students',this)">
+        <span class="nav-icon">🎓</span> Students
+      </a>
+      <a href="#" class="nav-item" data-page="tasks" onclick="showPage('tasks',this)">
+        <span class="nav-icon">📋</span> Assign Tasks
+      </a>
+      <a href="#" class="nav-item" data-page="fees" onclick="showPage('fees',this)">
+        <span class="nav-icon">💳</span> Due Fees
+      </a>
+    </nav>
+    <div class="sidebar-logout">
+      <a href="#" onclick="doLogout()" class="logout-btn">🔴 Logout</a>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main-content">
+
+    <!-- DASHBOARD -->
+    <div id="page-dashboard" class="page active">
+      <div class="hero-banner">
+        <div>
+          <h2>Hello, Teacher! 👋</h2>
+          <p>Get ready to manage your tuition tasks efficiently.</p>
+        </div>
+        <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" alt="teacher"
+          style="height:80px;opacity:.8" />
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon blue">🎓</div>
+          <div class="stat-label">Total Students</div>
+          <div class="stat-value" id="stat-students">–</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green">📚</div>
+          <div class="stat-label">Active Batches</div>
+          <div class="stat-value" id="stat-batches">–</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon red">₹</div>
+          <div class="stat-label">Pending Fees</div>
+          <div class="stat-value" id="stat-fees">– <span style="font-size:14px;color:#666">Students</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon yellow">📝</div>
+          <div class="stat-label">Doubts</div>
+          <div class="stat-value" id="stat-doubts">–</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DOUBTS -->
+    <div id="page-doubts" class="page">
+      <h2 class="page-title">Solve Doubts</h2>
+      <div id="doubts-list" class="doubts-list"></div>
+    </div>
+
+    <!-- STUDENTS -->
+    <div id="page-students" class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Students Directory</h2>
+          <p class="page-sub">Manage all enrolled students</p>
+        </div>
+        <button class="btn-dark" onclick="openAddStudent()">+ Add Student</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>NAME</th>
+              <th>CLASS</th>
+              <th>BATCH</th>
+              <th>SCHOOL</th>
+              <th>FEES</th>
+              <th>JOINED</th>
+              <th>ACTIONS</th>
+            </tr>
+          </thead>
+          <tbody id="students-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TASKS -->
+    <div id="page-tasks" class="page">
+      <h2 class="page-title">Assign Tasks</h2>
+      <div id="tasks-list" class="tasks-assign-list"></div>
+    </div>
+
+    <!-- FEES -->
+    <div id="page-fees" class="page">
+      <h2 class="page-title">Fees Management</h2>
+      <div class="table-wrap">
+        <table class="data-table fees-table">
+          <thead>
+            <tr>
+              <th>STUDENT</th>
+              <th>CLASS</th>
+              <th>BATCH</th>
+              <th>PENDING MONTHS</th>
+              <th>TOTAL DUE</th>
+            </tr>
+          </thead>
+          <tbody id="fees-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ADD STUDENT MODAL -->
+  <div id="modal-add-student" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="modal-student-title">Add Student</h3>
+        <button onclick="closeModal('modal-add-student')" class="modal-close">✕</button>
+      </div>
+      <div class="form-group"><label>Full Name</label><input id="s-name" type="text" placeholder="Student name" /></div>
+      <div class="form-group"><label>Email</label><input id="s-email" type="email" placeholder="student@email.com" />
+      </div>
+      <div class="form-group"><label>Password (for student login)</label><input id="s-password" type="text"
+          placeholder="student123" /></div>
+      <div class="form-row">
+        <div class="form-group"><label>Class</label><input id="s-class" type="text" placeholder="e.g. Class 9" /></div>
+        <div class="form-group"><label>Batch</label>
+          <select id="s-batch">
+            <option value="1st Batch">1st Batch</option>
+            <option value="2nd Batch">2nd Batch</option>
+            <option value="3rd Batch">3rd Batch</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label>School</label><input id="s-school" type="text" placeholder="School name" /></div>
+      <div class="form-group"><label>Monthly Fees (₹)</label><input id="s-fees" type="number" placeholder="0" /></div>
+      <div id="modal-err" class="error-msg"></div>
+      <button class="btn-dark full-width" onclick="saveStudent()">Save Student</button>
+    </div>
+  </div>
+
+  <!-- ASSIGN TASK MODAL -->
+  <div id="modal-assign-task" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div>
+          <h3 id="task-student-name">Student Name</h3>
+          <p id="task-student-batch" style="color:#666;font-size:14px"></p>
+        </div>
+        <button onclick="closeModal('modal-assign-task')" class="modal-close">✕</button>
+      </div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <div class="upload-box" onclick="document.getElementById('file-upload').click()">
+            <div style="font-size:24px">📄</div>
+            <div>Click to upload PDF or Image</div>
+            <input type="file" id="file-upload" accept=".pdf,image/*" style="display:none"
+              onchange="handleFileUpload(this)" />
+          </div>
+          <div id="file-name" style="font-size:12px;color:#666;margin-top:6px"></div>
+          <input id="task-title" type="text" placeholder="Title (e.g. Physics Notes)"
+            style="margin-top:10px;width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box" />
+        </div>
+        <div style="flex:1;min-width:200px">
+          <div style="font-weight:600;margin-bottom:10px">📋 Homework To-Dos</div>
+          <div id="task-items-list">
+            <div class="task-item-row"><input type="text" placeholder="Task 1" class="task-input" /></div>
+          </div>
+          <button onclick="addTaskItem()"
+            style="color:#1a3a6b;background:none;border:none;cursor:pointer;font-size:14px;padding:4px 0">+ Add Another
+            Task</button>
+        </div>
+      </div>
+      <div id="task-modal-err" class="error-msg" style="margin-top:10px"></div>
+      <button class="btn-blue full-width" style="margin-top:16px" onclick="sendTasks()">✈ Send All Tasks</button>
+    </div>
+  </div>
+
+  <!-- ANSWER DOUBT MODAL -->
+  <div id="modal-answer" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>Answer Doubt</h3>
+        <button onclick="closeModal('modal-answer')" class="modal-close">✕</button>
+      </div>
+      <div id="doubt-question-display"
+        style="background:#f0f4ff;padding:14px;border-radius:10px;margin-bottom:12px;font-style:italic"></div>
+      <div class="form-group">
+
+        <label>Your Answer</label>
+        <div style="display:flex;gap:10px;margin-bottom:14px">
+          <button onclick="searchOnChatGPT()"
+            style="display:flex;align-items:center;gap:8px;padding:9px 16px;border:1.5px solid #e5e7eb;border-radius:10px;background:#fff;cursor:pointer;font-size:13px;font-weight:600;color:#374151"
+            onmouseover="this.style.borderColor='#10a37f';this.style.color='#10a37f'"
+            onmouseout="this.style.borderColor='#e5e7eb';this.style.color='#374151'">
+            🤖 Ask ChatGPT
+          </button>
+          <button onclick="searchOnGoogle()"
+            style="display:flex;align-items:center;gap:8px;padding:9px 16px;border:1.5px solid #e5e7eb;border-radius:10px;background:#fff;cursor:pointer;font-size:13px;font-weight:600;color:#374151"
+            onmouseover="this.style.borderColor='#4285f4';this.style.color='#4285f4'"
+            onmouseout="this.style.borderColor='#e5e7eb';this.style.color='#374151'">
+            🔍 Search Google
+          </button>
+        </div>
+        <textarea id="doubt-answer" rows="5" placeholder="Type your answer here..."
+          style="width:100%;padding:12px;border:1px solid #ddd;border-radius:10px;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
+      </div>
+      <button class="btn-dark full-width" onclick="submitAnswer()">Submit Answer</button>
+    </div>
+  </div>
+
+  <script src="/static/js/teacher.js"></script>
+</body>
+
+</html>
