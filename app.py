@@ -2,15 +2,23 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 import sqlite3
 import os
 import hashlib
-from datetime import datetime
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
-app.secret_key = 'shikshasetu_secret_key_2026'
+app.secret_key = os.environ.get('SECRET_KEY', 'shikshasetu_secret_key_2026')
+
+# ── SESSION: stay logged in across deploys / browser restarts ──
+app.config['SESSION_PERMANENT'] = True
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = False  # set True if using HTTPS only
 
 from whitenoise import WhiteNoise
 app.wsgi_app = WhiteNoise(app.wsgi_app, root='static/', prefix='static')
 
-DB_PATH = 'shikshasetu.db'
+# ── DB PATH: use /data on Render (persistent disk), fallback to local ──
+DATA_DIR = '/data' if os.path.isdir('/data') else os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(DATA_DIR, 'shikshasetu.db')
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -126,23 +134,34 @@ def signup():
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.json
-    email = data.get('email','').strip()
+    email = data.get('email','').strip().lower()
     password = data.get('password','')
     role = data.get('role','')
     
     conn = get_db()
     c = conn.cursor()
-    user = c.execute('SELECT * FROM users WHERE email=? AND password=? AND role=?',
-                     (email, hash_password(password), role)).fetchone()
+
+    # FIX: look up by email+password only, then check role separately
+    # so teacher-added students (role='student') can always log in
+    user = c.execute(
+        'SELECT * FROM users WHERE LOWER(email)=? AND password=?',
+        (email, hash_password(password))
+    ).fetchone()
     conn.close()
+
+    if not user:
+        return jsonify({'error': 'Invalid email or password'}), 401
     
-    if user:
-        session['user_id'] = user['id']
-        session['user_name'] = user['name']
-        session['user_role'] = user['role']
-        session['user_email'] = user['email']
-        return jsonify({'success': True, 'role': role, 'name': user['name']})
-    return jsonify({'error': 'Invalid credentials'}), 401
+    # Role mismatch — tell user clearly instead of silent fail
+    if user['role'] != role:
+        return jsonify({'error': f'This account is registered as a {user["role"]}, not {role}'}), 401
+
+    session.permanent = True
+    session['user_id']    = user['id']
+    session['user_name']  = user['name']
+    session['user_role']  = user['role']
+    session['user_email'] = user['email']
+    return jsonify({'success': True, 'role': user['role'], 'name': user['name']})
 
 @app.route('/api/logout', methods=['POST'])
 def logout():
@@ -154,9 +173,9 @@ def me():
     if 'user_id' not in session:
         return jsonify({'error': 'Not logged in'}), 401
     return jsonify({
-        'id': session['user_id'],
-        'name': session['user_name'],
-        'role': session['user_role'],
+        'id':    session['user_id'],
+        'name':  session['user_name'],
+        'role':  session['user_role'],
         'email': session['user_email']
     })
 
@@ -214,19 +233,21 @@ def add_student():
     conn = get_db()
     c = conn.cursor()
     
+    email = data.get('email', '').strip().lower()
+    
     # Create user account for student
     try:
         c.execute('INSERT INTO users (name, email, password, role) VALUES (?,?,?,?)',
-                  (data['name'], data['email'], hash_password(data.get('password','student123')), 'student'))
+                  (data['name'], email, hash_password(data.get('password','student123')), 'student'))
         student_user_id = c.lastrowid
     except sqlite3.IntegrityError:
-        # If email exists, get the user
-        existing = c.execute('SELECT id FROM users WHERE email=?', (data['email'],)).fetchone()
-        if existing:
+        # Email exists — only reuse if it's a student account
+        existing = c.execute('SELECT id, role FROM users WHERE LOWER(email)=?', (email,)).fetchone()
+        if existing and existing['role'] == 'student':
             student_user_id = existing['id']
         else:
             conn.close()
-            return jsonify({'error': 'Email already in use'}), 400
+            return jsonify({'error': 'Email already in use by another account'}), 400
     
     c.execute('''INSERT INTO students (user_id, teacher_id, class, batch, school, fees, joined_date) 
                  VALUES (?,?,?,?,?,?,?)''',
@@ -244,7 +265,6 @@ def update_student(sid):
     conn = get_db()
     c = conn.cursor()
     
-    # Get student record to find user_id
     stu = c.execute('SELECT user_id FROM students WHERE id=? AND teacher_id=?', (sid, uid)).fetchone()
     if not stu:
         conn.close()
@@ -385,14 +405,12 @@ def add_fee():
     conn = get_db()
     c = conn.cursor()
     
-    # Get student's fee amount
     stu = c.execute('SELECT fees, user_id FROM students WHERE user_id=? AND teacher_id=?',
                     (data['student_id'], uid)).fetchone()
     if not stu:
         conn.close()
         return jsonify({'error': 'Student not found'}), 404
     
-    # Toggle: if exists, remove; else add as unpaid
     existing = c.execute('SELECT id FROM fees WHERE student_id=? AND teacher_id=? AND month=? AND year=?',
                          (data['student_id'], uid, data['month'], data['year'])).fetchone()
     if existing:
@@ -434,7 +452,6 @@ def student_stats():
     conn = get_db()
     c = conn.cursor()
     
-    # pending tasks
     pending_items = c.execute('''
         SELECT COUNT(*) FROM task_items ti
         JOIN tasks t ON ti.task_id = t.id
@@ -447,7 +464,6 @@ def student_stats():
         WHERE t.student_id=? AND ti.completed=1
     ''', (uid,)).fetchone()[0]
     
-    # fees
     total_due = c.execute('''SELECT COALESCE(SUM(amount),0) FROM fees 
                              WHERE student_id=? AND status="unpaid"''', (uid,)).fetchone()[0]
     
@@ -475,7 +491,6 @@ def post_doubt():
     conn = get_db()
     c = conn.cursor()
     
-    # find teacher
     stu = c.execute('SELECT teacher_id FROM students WHERE user_id=?', (uid,)).fetchone()
     if not stu:
         conn.close()
@@ -498,7 +513,6 @@ def student_assignments():
         items = c.execute('SELECT * FROM task_items WHERE task_id=?', (t['id'],)).fetchall()
         d = dict(t)
         d['items'] = [dict(i) for i in items]
-        # status
         all_done = all(i['completed'] for i in items) if items else False
         d['status'] = 'completed' if all_done else 'pending'
         result.append(d)
