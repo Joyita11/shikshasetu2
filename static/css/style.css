@@ -27,23 +27,29 @@ a {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 60px;
+  padding: 16px 40px;
   border-bottom: 1px solid rgba(255, 255, 255, .1);
+  flex-wrap: wrap;
+  gap: 10px;
+  position: sticky;
+  top: 0;
+  background: #0d0d2b;
+  z-index: 50;
+}
+
+font-weight: 700;
+display: flex;
+align-items: center;
+gap: 10px;
 }
 
 .logo {
   font-size: 22px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
 
-.logo-icon {
-  font-size: 26px;
-}
+  .logo-icon {
+    font-size: 26px;
+  }
 
-.btn-outline {
   border: 1px solid rgba(255, 255, 255, .4);
   color: #fff;
   padding: 8px 20px;
