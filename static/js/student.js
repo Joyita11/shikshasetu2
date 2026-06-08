@@ -205,33 +205,70 @@ async function completeTask(itemId) {
 }
 
 // ─── FEES ───
-// FIX: Added data-label attributes to every <td> so the mobile card CSS
-// can display mini column headers above each value without a visible table header row.
 async function loadFees() {
   const res = await fetch('/api/student/fees');
-  const fees = await res.json();
+  const data = await res.json();
+
+  // New API returns { fees: [...], teacher_upi: '...', teacher_name: '...' }
+  const fees = data.fees || [];
+  const teacherUpi = data.teacher_upi || '';
+  const teacherName = data.teacher_name || 'Teacher';
+
   const tbody = document.getElementById('fees-tbody-student');
   if (!fees.length) {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:#666">No fee records found.</td></tr>';
     return;
   }
+
   tbody.innerHTML = fees.map(f => {
     const isPaid = f.status === 'paid';
     const statusBadge = isPaid
       ? '<span class="fee-status-paid">✓ Paid</span>'
       : '<span class="fee-status-unpaid">✗ Unpaid</span>';
-    const actionBtn = isPaid
+
+    // Cash payment — always shown for unpaid rows
+    const markPaidBtn = isPaid
       ? '<span class="completed-action">✓ Completed</span>'
-      : `<button class="btn-mark-paid" onclick="markPaid(${f.id})">Mark as Paid</button>`;
+      : `<button class="btn-mark-paid" onclick="markPaid(${f.id})">💵 Mark as Paid</button>`;
+
+    // Online payment — only shown when teacher has a UPI ID set and fee is unpaid
+    let payOnlineBtn = '';
+    if (!isPaid && teacherUpi) {
+      // UPI deep link — opens GPay / PhonePe / any UPI app on mobile
+      // upi://pay?pa=UPI_ID&pn=NAME&am=AMOUNT&cu=INR&tn=NOTE
+      const upiNote = encodeURIComponent(`Tuition fee ${f.month} ${f.year}`);
+      const upiLink = `upi://pay?pa=${encodeURIComponent(teacherUpi)}&pn=${encodeURIComponent(teacherName)}&am=${Number(f.amount).toFixed(2)}&cu=INR&tn=${upiNote}`;
+      payOnlineBtn = `
+        <a href="${upiLink}"
+          style="display:inline-flex;align-items:center;gap:6px;background:#1a73e8;color:#fff;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;text-decoration:none;margin-top:6px;touch-action:manipulation"
+          onclick="handleUpiClick(event, '${upiLink}')">
+          📲 Pay Online
+        </a>`;
+    }
+
     return `
     <tr>
       <td data-label="Month">${escHtml(f.month)}</td>
       <td data-label="Year">${f.year}</td>
       <td data-label="Status">${statusBadge}</td>
-      <td data-label="Action">${actionBtn}</td>
+      <td data-label="Action" style="display:flex;flex-direction:column;gap:4px;align-items:flex-start">
+        ${markPaidBtn}
+        ${payOnlineBtn}
+      </td>
       <td data-label="Amount">₹${Number(f.amount).toFixed(2)}</td>
     </tr>`;
   }).join('');
+}
+
+// UPI deep links only work on mobile (where UPI apps are installed).
+// On desktop, show a friendly message instead of a broken link.
+function handleUpiClick(e, upiLink) {
+  const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+  if (!isMobile) {
+    e.preventDefault();
+    alert('📲 UPI payment works on mobile only.\nOpen this page on your phone to pay via GPay, PhonePe, or any UPI app.');
+  }
+  // On mobile — let the default href open the UPI app directly
 }
 
 async function markPaid(feeId) {
