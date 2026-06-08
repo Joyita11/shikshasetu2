@@ -2,6 +2,8 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 import sqlite3
 import os
 import hashlib
+import secrets
+import string
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
@@ -30,6 +32,26 @@ def get_db():
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
+
+
+def validate_password(password):
+    """Returns (ok, error_message). Rules: 8+ chars, 1 uppercase, 1 lowercase, 1 digit."""
+    if len(password) < 8:
+        return False, 'Password must be at least 8 characters'
+    if not any(c.isupper() for c in password):
+        return False, 'Password needs at least one uppercase letter (A-Z)'
+    if not any(c.islower() for c in password):
+        return False, 'Password needs at least one lowercase letter (a-z)'
+    if not any(c.isdigit() for c in password):
+        return False, 'Password needs at least one number (0-9)'
+    return True, ''
+
+def generate_student_login_id(teacher_id, student_name):
+    """Auto-generate a unique internal login ID for a student.
+    Format: firstname.teacherXX.RRRR@setu.local — guaranteed unique, never visible to student externally."""
+    name_slug = ''.join(c for c in student_name.lower() if c.isalpha())[:10]
+    rand = ''.join(secrets.choice(string.digits) for _ in range(6))
+    return f"{name_slug}.t{teacher_id}.{rand}@setu.local"
 
 def init_db():
     conn = get_db()
@@ -135,7 +157,13 @@ def signup():
     
     if not all([name, email, password, role]):
         return jsonify({'error': 'All fields required'}), 400
-    
+
+    # FIX 3: Validate password strength for teacher self-signup
+    if role == 'teacher':
+        ok, msg = validate_password(password)
+        if not ok:
+            return jsonify({'error': msg}), 400
+
     conn = get_db()
     c = conn.cursor()
     try:
@@ -243,33 +271,64 @@ def get_students():
 
 @app.route('/api/teacher/students', methods=['POST'])
 def add_student():
+    """
+    FIX 4 & 5: Teacher no longer enters email. We auto-generate a unique internal
+    login ID so two students with the same name never collide, and deleted+re-added
+    students get a fresh account (old login stops working immediately).
+    Returns the generated login_id and password so teacher can share with student.
+    """
     uid = session.get('user_id')
     data = request.json
     conn = get_db()
     c = conn.cursor()
-    
-    email = data.get('email', '').strip().lower()
-    
+
+    name = data.get('name', '').strip()
+    if not name:
+        conn.close()
+        return jsonify({'error': 'Student name is required'}), 400
+
+    # FIX 3: Validate teacher-set password, or auto-generate a strong one
+    raw_password = data.get('password', '').strip()
+    if raw_password:
+        ok, msg = validate_password(raw_password)
+        if not ok:
+            conn.close()
+            return jsonify({'error': msg}), 400
+    else:
+        # Auto-generate: 10 chars with guaranteed uppercase + digit
+        chars = string.ascii_letters + string.digits
+        raw_password = (
+            secrets.choice(string.ascii_uppercase) +
+            secrets.choice(string.digits) +
+            ''.join(secrets.choice(chars) for _ in range(8))
+        )
+        # Shuffle so uppercase/digit aren't always first
+        lst = list(raw_password)
+        secrets.SystemRandom().shuffle(lst)
+        raw_password = ''.join(lst)
+
+    # FIX 4 & 5: Generate unique internal login ID — teacher never sees/sets it
+    login_id = generate_student_login_id(uid, name)
+    while c.execute('SELECT id FROM users WHERE email=?', (login_id,)).fetchone():
+        login_id = generate_student_login_id(uid, name)  # retry on extreme collision
+
     try:
         c.execute('INSERT INTO users (name, email, password, role) VALUES (?,?,?,?)',
-                  (data['name'], email, hash_password(data.get('password','student123')), 'student'))
+                  (name, login_id, hash_password(raw_password), 'student'))
         student_user_id = c.lastrowid
     except sqlite3.IntegrityError:
-        existing = c.execute('SELECT id, role FROM users WHERE LOWER(email)=?', (email,)).fetchone()
-        if existing and existing['role'] == 'student':
-            student_user_id = existing['id']
-        else:
-            conn.close()
-            return jsonify({'error': 'Email already in use by another account'}), 400
-    
-    c.execute('''INSERT INTO students (user_id, teacher_id, class, batch, school, fees, joined_date) 
+        conn.close()
+        return jsonify({'error': 'Could not create student, please try again'}), 400
+
+    c.execute('''INSERT INTO students (user_id, teacher_id, class, batch, school, fees, joined_date)
                  VALUES (?,?,?,?,?,?,?)''',
-              (student_user_id, uid, data.get('class',''), data.get('batch',''),
-               data.get('school',''), float(data.get('fees',0)),
+              (student_user_id, uid, data.get('class', ''), data.get('batch', ''),
+               data.get('school', ''), float(data.get('fees', 0)),
                datetime.now().strftime('%Y-%m-%d')))
     conn.commit()
     conn.close()
-    return jsonify({'success': True})
+    # Return credentials so teacher can share with student (shown once in UI)
+    return jsonify({'success': True, 'login_id': login_id, 'password': raw_password})
 
 @app.route('/api/teacher/students/<int:sid>', methods=['PUT'])
 def update_student(sid):
@@ -293,10 +352,45 @@ def update_student(sid):
 
 @app.route('/api/teacher/students/<int:sid>', methods=['DELETE'])
 def delete_student(sid):
+    """
+    FIX 1: Proper cascade delete.
+    Steps:
+      1. Find the student's user_id (verify ownership)
+      2. Delete fees, doubts, task_items, tasks for this teacher-student pair
+      3. Delete the students row
+      4. Delete the users row — this kills login immediately.
+         (Safe because auto-generated login IDs are unique per add, so
+          re-adding the student creates a brand new account.)
+    """
     uid = session.get('user_id')
     conn = get_db()
     c = conn.cursor()
+
+    row = c.execute('SELECT user_id FROM students WHERE id=? AND teacher_id=?', (sid, uid)).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({'error': 'Student not found'}), 404
+
+    student_uid = row['user_id']
+
+    # Delete child records for this teacher-student relationship
+    c.execute('DELETE FROM fees   WHERE student_id=? AND teacher_id=?', (student_uid, uid))
+    c.execute('DELETE FROM doubts WHERE student_id=? AND teacher_id=?', (student_uid, uid))
+
+    task_ids = [r[0] for r in c.execute(
+        'SELECT id FROM tasks WHERE student_id=? AND teacher_id=?', (student_uid, uid)
+    ).fetchall()]
+    for tid in task_ids:
+        c.execute('DELETE FROM task_items WHERE task_id=?', (tid,))
+    c.execute('DELETE FROM tasks WHERE student_id=? AND teacher_id=?', (student_uid, uid))
+
+    # Delete the student profile row
     c.execute('DELETE FROM students WHERE id=? AND teacher_id=?', (sid, uid))
+
+    # Delete the user account entirely — login_id was auto-generated and unique,
+    # so this is safe. Deleted student can no longer log in at all.
+    c.execute('DELETE FROM users WHERE id=?', (student_uid,))
+
     conn.commit()
     conn.close()
     return jsonify({'success': True})

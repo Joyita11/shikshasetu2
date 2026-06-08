@@ -137,41 +137,44 @@ async function loadStudents() {
 }
 
 function openAddStudent() {
+  // FIX 4 & 5: no email field; reset cred box
   editStudentId = null;
   document.getElementById('modal-student-title').textContent = 'Add Student';
-  ['s-name', 's-email', 's-password', 's-class', 's-school'].forEach(id => document.getElementById(id).value = '');
+  ['s-name', 's-password', 's-class', 's-school'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('s-fees').value = '';
   document.getElementById('s-batch').value = '1st Batch';
   document.getElementById('modal-err').textContent = '';
+  document.getElementById('cred-box').style.display = 'none';
   document.getElementById('modal-add-student').style.display = 'flex';
 }
 
 function openEditStudent(id, data) {
+  // FIX 5: no email field
   editStudentId = id;
   document.getElementById('modal-student-title').textContent = 'Edit Student';
   document.getElementById('s-name').value = data.name || '';
-  document.getElementById('s-email').value = '';
   document.getElementById('s-password').value = '';
   document.getElementById('s-class').value = data.class || '';
   document.getElementById('s-batch').value = data.batch || '1st Batch';
   document.getElementById('s-school').value = data.school || '';
   document.getElementById('s-fees').value = data.fees || '';
   document.getElementById('modal-err').textContent = '';
+  document.getElementById('cred-box').style.display = 'none';
   document.getElementById('modal-add-student').style.display = 'flex';
 }
 
 async function saveStudent() {
+  // FIX 4 & 5: no email; show generated login_id + password after add
   const err = document.getElementById('modal-err');
   err.textContent = '';
   const name = document.getElementById('s-name').value.trim();
-  const email = document.getElementById('s-email').value.trim();
-  const password = document.getElementById('s-password').value.trim() || 'student123';
+  const password = document.getElementById('s-password').value.trim(); // blank = auto-generate on server
   const cls = document.getElementById('s-class').value.trim();
   const batch = document.getElementById('s-batch').value;
   const school = document.getElementById('s-school').value.trim();
   const fees = document.getElementById('s-fees').value;
 
-  if (!name) { err.textContent = 'Name is required.'; return; }
+  if (!name) { err.textContent = 'Student name is required.'; return; }
 
   if (editStudentId) {
     const res = await fetch(`/api/teacher/students/${editStudentId}`, {
@@ -183,15 +186,22 @@ async function saveStudent() {
     if (d.success) { closeModal('modal-add-student'); loadStudents(); }
     else err.textContent = d.error || 'Failed.';
   } else {
-    if (!email) { err.textContent = 'Email is required.'; return; }
     const res = await fetch('/api/teacher/students', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password, class: cls, batch, school, fees })
+      body: JSON.stringify({ name, password, class: cls, batch, school, fees })
     });
     const d = await res.json();
-    if (d.success) { closeModal('modal-add-student'); loadStudents(); loadDashboard(); }
-    else err.textContent = d.error || 'Failed.';
+    if (d.success) {
+      // Show generated credentials — teacher must share these with student
+      document.getElementById('cred-login').textContent = d.login_id;
+      document.getElementById('cred-pw').textContent = d.password;
+      document.getElementById('cred-box').style.display = 'block';
+      loadStudents();
+      loadDashboard();
+    } else {
+      err.textContent = d.error || 'Failed.';
+    }
   }
 }
 

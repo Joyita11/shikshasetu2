@@ -11,61 +11,100 @@
 <body class="auth-body">
   <div class="auth-bg">
     <div class="auth-card">
+      <div class="auth-logo"><span>🎓</span> ShikshaSetu</div>
       <h2>Create Account</h2>
-      <p class="auth-sub">Join ShikshaSetu today</p>
+      <p class="auth-sub">Join ShikshaSetu today — it's free.</p>
 
       <div class="form-group">
         <label>I am a:</label>
         <select id="role">
           <option value="">Select your role</option>
           <option value="teacher">Teacher</option>
-          <option value="student">Student</option>
         </select>
+        <p style="font-size:15px;color:var(--ink-3);margin-top:8px">
+          ℹ️ Students are added by their teacher — ask your teacher to create your account.
+        </p>
       </div>
+
       <div class="form-group">
         <label>Full Name</label>
         <input type="text" id="name" placeholder="Your full name" />
       </div>
+
       <div class="form-group">
         <label>Email Address</label>
         <input type="email" id="email" placeholder="name@example.com" />
       </div>
+
       <div class="form-group">
         <label>Password</label>
-        <input type="password" id="password" placeholder="Create a password" />
+        <div class="pw-wrap">
+          <input type="password" id="password" placeholder="Create a strong password"
+            oninput="checkStrength(this.value)" autocomplete="new-password" />
+          <button type="button" class="pw-eye" onclick="togglePw('password', this)"
+            aria-label="Toggle password">👁</button>
+        </div>
+        <div class="strength-bar">
+          <span id="bar1"></span><span id="bar2"></span><span id="bar3"></span><span id="bar4"></span>
+        </div>
+        <div class="strength-label" id="strength-label"></div>
+        <ul class="rule-list" id="rules">
+          <li id="r-len">At least 8 characters</li>
+          <li id="r-upper">One uppercase letter (A–Z)</li>
+          <li id="r-lower">One lowercase letter (a–z)</li>
+          <li id="r-digit">One number (0–9)</li>
+        </ul>
       </div>
-      <div id="error-msg" class="error-msg"></div>
-      <div id="success-msg" class="success-msg"></div>
-      <button class="btn-signin" onclick="doSignup()">Create Account</button>
+
+      <div id="error-msg" class="error-msg" style="display:none"></div>
+      <div id="success-msg" class="success-msg" style="display:none"></div>
+      <button class="btn-signin" onclick="doSignup()">Create Account →</button>
       <p class="auth-footer">Already have an account? <a href="/login">Sign In</a></p>
     </div>
   </div>
+
   <script>
+    function togglePw(id, btn) {
+      const el = document.getElementById(id);
+      el.type = el.type === 'password' ? 'text' : 'password';
+      btn.textContent = el.type === 'password' ? '👁' : '🙈';
+    }
+
+    const COLORS = ['', '#dc2626', '#d97706', '#84cc16', '#15803d'];
+    const LABELS = ['', 'Weak', 'Fair', 'Good', 'Strong ✔'];
+
+    function checkStrength(pw) {
+      const rules = { len: pw.length >= 8, upper: /[A-Z]/.test(pw), lower: /[a-z]/.test(pw), digit: /[0-9]/.test(pw) };
+      const score = Object.values(rules).filter(Boolean).length;
+      for (let i = 1; i <= 4; i++) document.getElementById('bar' + i).style.background = i <= score ? COLORS[score] : 'var(--sand)';
+      const lbl = document.getElementById('strength-label');
+      lbl.textContent = pw.length ? LABELS[score] : '';
+      lbl.style.color = COLORS[score];
+      document.getElementById('r-len').className = rules.len ? 'ok' : '';
+      document.getElementById('r-upper').className = rules.upper ? 'ok' : '';
+      document.getElementById('r-lower').className = rules.lower ? 'ok' : '';
+      document.getElementById('r-digit').className = rules.digit ? 'ok' : '';
+    }
+
     async function doSignup() {
       const role = document.getElementById('role').value;
-      const name = document.getElementById('name').value;
-      const email = document.getElementById('email').value;
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
       const err = document.getElementById('error-msg');
       const succ = document.getElementById('success-msg');
-      err.textContent = ''; succ.textContent = '';
+      err.style.display = 'none'; succ.style.display = 'none';
 
-      if (!role || !name || !email || !password) {
-        err.textContent = 'Please fill all fields.';
-        return;
-      }
+      if (!role) { err.textContent = 'Please select your role.'; err.style.display = 'block'; return; }
+      if (!name || !email || !password) { err.textContent = 'Please fill all fields.'; err.style.display = 'block'; return; }
 
-      const res = await fetch('/api/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role, name, email, password })
-      });
+      const res = await fetch('/api/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role, name, email, password }) });
       const data = await res.json();
       if (data.success) {
-        succ.textContent = 'Account created! Redirecting to login...';
+        succ.textContent = 'Account created! Redirecting to login…'; succ.style.display = 'block';
         setTimeout(() => window.location.href = '/login', 1500);
       } else {
-        err.textContent = data.error || 'Signup failed.';
+        err.textContent = data.error || 'Signup failed.'; err.style.display = 'block';
       }
     }
   </script>
