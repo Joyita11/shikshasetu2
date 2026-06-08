@@ -21,17 +21,17 @@
   <aside class="sidebar student-sidebar" id="sidebar">
     <div class="sidebar-logo"><span>🎓</span> ShikshaSetu</div>
     <nav class="sidebar-nav">
-      <a href="#" class="nav-item active" data-page="dashboard" onclick="showPage('dashboard',this)"><span
-          class="nav-icon">🏠</span> Dashboard</a>
-      <a href="#" class="nav-item" data-page="doubts" onclick="showPage('doubts',this)"><span class="nav-icon">💬</span>
-        Post Doubts</a>
-      <a href="#" class="nav-item" data-page="assignments" onclick="showPage('assignments',this)"><span
-          class="nav-icon">📄</span> Assignments</a>
-      <a href="#" class="nav-item" data-page="fees" onclick="showPage('fees',this)"><span class="nav-icon">💼</span> Due
-        Fees</a>
+      <a href="javascript:void(0)" class="nav-item active" data-page="dashboard"
+        onclick="showPage('dashboard',this);return false"><span class="nav-icon">🏠</span> Dashboard</a>
+      <a href="javascript:void(0)" class="nav-item" data-page="doubts"
+        onclick="showPage('doubts',this);return false"><span class="nav-icon">💬</span> Post Doubts</a>
+      <a href="javascript:void(0)" class="nav-item" data-page="assignments"
+        onclick="showPage('assignments',this);return false"><span class="nav-icon">📄</span> Assignments</a>
+      <a href="javascript:void(0)" class="nav-item" data-page="fees" onclick="showPage('fees',this);return false"><span
+          class="nav-icon">💼</span> Due Fees</a>
     </nav>
     <div class="sidebar-logout">
-      <a href="#" onclick="doLogout()" class="logout-btn">🔴 Logout</a>
+      <a href="javascript:void(0)" onclick="doLogout();return false" class="logout-btn">🔴 Logout</a>
     </div>
   </aside>
 
@@ -48,7 +48,8 @@
           <div class="stat-value" id="stu-pending-tasks">–</div>
           <div id="stu-completed-tasks" style="color:var(--green);font-size:16px;margin-top:6px;font-weight:600"></div>
           <button class="btn-dark" style="margin-top:16px;font-size:15px;padding:10px 20px"
-            onclick="showPage('assignments',document.querySelector('[data-page=assignments]'))">View All</button>
+            onclick="showPage('assignments',document.querySelector('[data-page=assignments]'));return false">View
+            All</button>
         </div>
         <div class="stat-card">
           <div class="stat-icon green">💼</div>
@@ -56,7 +57,7 @@
           <div class="stat-value" id="stu-fees-status" style="color:var(--red)">–</div>
           <div id="stu-fees-due" style="color:var(--ink-3);font-size:16px;margin-top:6px;font-weight:600"></div>
           <button class="btn-outline-small" style="margin-top:16px"
-            onclick="showPage('fees',document.querySelector('[data-page=fees]'))">View History</button>
+            onclick="showPage('fees',document.querySelector('[data-page=fees]'));return false">View History</button>
         </div>
       </div>
       <div class="quote-banner">
