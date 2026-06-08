@@ -209,11 +209,7 @@ async function loadFees() {
   const res = await fetch('/api/student/fees');
   const data = await res.json();
 
-  // New API returns { fees: [...], teacher_upi: '...', teacher_name: '...' }
   const fees = data.fees || [];
-  const teacherUpi = data.teacher_upi || '';
-  const teacherName = data.teacher_name || 'Teacher';
-
   const tbody = document.getElementById('fees-tbody-student');
   if (!fees.length) {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:#666">No fee records found.</td></tr>';
@@ -225,72 +221,18 @@ async function loadFees() {
     const statusBadge = isPaid
       ? '<span class="fee-status-paid">✓ Paid</span>'
       : '<span class="fee-status-unpaid">✗ Unpaid</span>';
-
-    // Cash payment — always shown for unpaid rows
-    const markPaidBtn = isPaid
+    const actionBtn = isPaid
       ? '<span class="completed-action">✓ Completed</span>'
-      : `<button class="btn-mark-paid" onclick="markPaid(${f.id})">💵 Mark as Paid</button>`;
-
-    // Online payment — only shown when teacher has a UPI ID set and fee is unpaid
-    let payOnlineBtn = '';
-    if (!isPaid && teacherUpi) {
-      // Store payment data as data attributes on the button — avoids escaping issues in onclick strings
-      // The actual URL is built in openUpiPayment() at click time based on the device
-      payOnlineBtn = `
-        <button class="btn-pay-online"
-          data-upi="${escHtml(teacherUpi)}"
-          data-name="${escHtml(teacherName)}"
-          data-amount="${Number(f.amount).toFixed(2)}"
-          data-note="${escHtml('Tuition fee ' + f.month + ' ' + f.year)}"
-          onclick="openUpiPayment(this)">
-          📲 Pay Online
-        </button>`;
-    }
-
+      : `<button class="btn-mark-paid" onclick="markPaid(${f.id})">Mark as Paid</button>`;
     return `
     <tr>
       <td data-label="Month">${escHtml(f.month)}</td>
       <td data-label="Year">${f.year}</td>
       <td data-label="Status">${statusBadge}</td>
-      <td data-label="Action" style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">
-        ${markPaidBtn}
-        ${payOnlineBtn}
-      </td>
+      <td data-label="Action">${actionBtn}</td>
       <td data-label="Amount">₹${Number(f.amount).toFixed(2)}</td>
     </tr>`;
   }).join('');
-}
-
-// ── UPI Payment handler ──
-// Uses intent:// scheme on Android — this bypasses the "blocked by authorities"
-// error that GPay/PhonePe show when upi:// is opened from a browser WebView.
-// Uses upi:// on iOS (intent:// is Android-only).
-// Shows a desktop fallback message with the UPI ID to pay manually.
-function openUpiPayment(btn) {
-  const upiId = btn.getAttribute('data-upi');
-  const name = btn.getAttribute('data-name');
-  const amount = btn.getAttribute('data-amount');
-  const note = btn.getAttribute('data-note');
-
-  const ua = navigator.userAgent;
-  const isAndroid = /Android/i.test(ua);
-  const isIOS = /iPhone|iPad/i.test(ua);
-
-  if (isAndroid) {
-    // intent:// scheme — Android opens the UPI app chooser directly
-    // without the WebView payment-blocked restriction
-    const intentUrl = `intent://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(name)}&am=${encodeURIComponent(amount)}&cu=INR&tn=${encodeURIComponent(note)}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
-    window.location.href = intentUrl;
-
-  } else if (isIOS) {
-    // Standard upi:// works fine on iOS (no WebView block)
-    const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(name)}&am=${encodeURIComponent(amount)}&cu=INR&tn=${encodeURIComponent(note)}`;
-    window.location.href = upiUrl;
-
-  } else {
-    // Desktop — UPI apps aren't installed, show the details to pay manually
-    alert(`📲 UPI payment is mobile-only.\n\nTo pay ₹${amount}, open GPay / PhonePe on your phone and send to:\n\nUPI ID: ${upiId}\nName: ${name}\nAmount: ₹${amount}\nNote: ${note}`);
-  }
 }
 
 async function markPaid(feeId) {

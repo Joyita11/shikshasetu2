@@ -1227,26 +1227,6 @@ button {
   background: var(--teal-dark);
 }
 
-/* Pay Online button — blue to distinguish from cash Mark as Paid */
-.btn-pay-online {
-  background: #1a73e8;
-  color: var(--white);
-  border: none;
-  border-radius: 10px;
-  padding: 10px 22px;
-  font-size: 15px;
-  font-weight: 700;
-  font-family: 'DM Sans', sans-serif;
-  cursor: pointer;
-  transition: all .2s;
-  touch-action: manipulation;
-  /* no tap delay on mobile */
-}
-
-.btn-pay-online:hover {
-  background: #1558b0;
-}
-
 .completed-action {
   color: var(--green);
   font-size: 15px;

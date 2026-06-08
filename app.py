@@ -232,30 +232,6 @@ def me():
         'email': session['user_email']
     })
 
-@app.route('/api/teacher/upi', methods=['GET'])
-def get_upi():
-    """Return the logged-in teacher's saved UPI ID."""
-    uid = session.get('user_id')
-    if not uid or session.get('user_role') != 'teacher':
-        return jsonify({'error': 'Unauthorized'}), 401
-    conn = get_db()
-    row = conn.execute('SELECT upi_id FROM users WHERE id=?', (uid,)).fetchone()
-    conn.close()
-    return jsonify({'upi_id': row['upi_id'] or ''})
-
-@app.route('/api/teacher/upi', methods=['POST'])
-def save_upi():
-    """Save or update the teacher's UPI ID."""
-    uid = session.get('user_id')
-    if not uid or session.get('user_role') != 'teacher':
-        return jsonify({'error': 'Unauthorized'}), 401
-    upi_id = (request.json.get('upi_id') or '').strip()
-    conn = get_db()
-    conn.execute('UPDATE users SET upi_id=? WHERE id=?', (upi_id, uid))
-    conn.commit()
-    conn.close()
-    return jsonify({'success': True})
-
 # ─────────────────────────── TEACHER ───────────────────────────
 
 @app.route('/teacher')
@@ -676,8 +652,6 @@ def student_fees():
     uid = session.get('user_id')
     conn = get_db()
     c = conn.cursor()
-
-    # Get fee rows
     rows = c.execute('''SELECT * FROM fees WHERE student_id=? 
                         ORDER BY year DESC,
                         CASE month 
@@ -686,20 +660,8 @@ def student_fees():
                           WHEN "Jul" THEN 7 WHEN "Aug" THEN 8 WHEN "Sep" THEN 9
                           WHEN "Oct" THEN 10 WHEN "Nov" THEN 11 WHEN "Dec" THEN 12
                         END DESC''', (uid,)).fetchall()
-
-    # Get teacher's UPI ID and name so student can pay online
-    teacher = c.execute('''
-        SELECT u.name, u.upi_id FROM students s
-        JOIN users u ON u.id = s.teacher_id
-        WHERE s.user_id=?
-    ''', (uid,)).fetchone()
-
     conn.close()
-    return jsonify({
-        'fees': [dict(r) for r in rows],
-        'teacher_upi': teacher['upi_id'] if teacher else '',
-        'teacher_name': teacher['name'] if teacher else ''
-    })
+    return jsonify([dict(r) for r in rows])
 
 @app.route('/api/student/fees/<int:fid>/pay', methods=['POST'])
 def mark_fee_paid(fid):

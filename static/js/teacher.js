@@ -49,10 +49,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // UPI save button on dashboard
-  var saveUpiBtn = document.getElementById('save-upi-btn');
-  if (saveUpiBtn) saveUpiBtn.addEventListener('click', saveUpiId);
-
   // Task modal — ChatGPT, Google, Send buttons (wired here to avoid inline onclick)
   var chatgptBtn = document.getElementById('task-chatgpt-btn');
   if (chatgptBtn) chatgptBtn.addEventListener('click', function () { openTaskSearch('chatgpt'); });
@@ -78,25 +74,6 @@ async function loadDashboard() {
   document.getElementById('stat-batches').textContent = d.active_batches;
   document.getElementById('stat-fees').innerHTML = `<span style="color:#e74c3c">${d.pending_fees_students}</span> <span style="font-size:14px;color:#666">Students</span>`;
   document.getElementById('stat-doubts').textContent = d.doubts;
-
-  // Load saved UPI ID into the input field
-  const upiRes = await fetch('/api/teacher/upi');
-  const upiData = await upiRes.json();
-  const upiInput = document.getElementById('teacher-upi-input');
-  if (upiInput) upiInput.value = upiData.upi_id || '';
-}
-
-async function saveUpiId() {
-  const upiId = (document.getElementById('teacher-upi-input').value || '').trim();
-  const msg = document.getElementById('upi-save-msg');
-  await fetch('/api/teacher/upi', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ upi_id: upiId })
-  });
-  msg.textContent = upiId ? '✅ UPI ID saved! Students can now pay online.' : '✅ UPI ID cleared.';
-  msg.style.display = 'block';
-  setTimeout(() => { msg.style.display = 'none'; }, 3000);
 }
 
 // ─── DOUBTS ───
