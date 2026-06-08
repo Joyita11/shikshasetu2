@@ -67,6 +67,8 @@ img {
 
 button {
   font-family: inherit;
+  touch-action: manipulation;
+  /* removes 300ms tap delay on ALL buttons sitewide */
 }
 
 
@@ -403,6 +405,9 @@ button {
   transition: all .2s;
   margin-bottom: 18px;
   letter-spacing: .3px;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .btn-signin:hover {
@@ -542,7 +547,8 @@ button {
   left: 0;
   top: 0;
   bottom: 0;
-  z-index: 100;
+  z-index: 250;
+  /* ABOVE the overlay (150) and hamburger (200) so nav links are tappable */
   box-shadow: 4px 0 24px rgba(0, 0, 0, .15);
 }
 
@@ -1368,7 +1374,8 @@ button {
   position: fixed;
   top: 16px;
   left: 16px;
-  z-index: 200;
+  z-index: 260;
+  /* above sidebar (250) so it's always tappable */
   background: var(--teal-dark);
   border: none;
   border-radius: 12px;

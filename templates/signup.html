@@ -58,7 +58,7 @@
 
       <div id="error-msg" class="error-msg" style="display:none"></div>
       <div id="success-msg" class="success-msg" style="display:none"></div>
-      <button class="btn-signin" onclick="doSignup()">Create Account →</button>
+      <button class="btn-signin" id="signup-btn">Create Account →</button>
       <p class="auth-footer">Already have an account? <a href="/login">Sign In</a></p>
     </div>
   </div>
@@ -107,6 +107,9 @@
         err.textContent = data.error || 'Signup failed.'; err.style.display = 'block';
       }
     }
+
+    // Wire via addEventListener — no inline onclick (unreliable on mobile)
+    document.getElementById('signup-btn').addEventListener('click', doSignup);
   </script>
 </body>
 

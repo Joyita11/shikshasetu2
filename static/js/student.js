@@ -9,6 +9,10 @@ function closeSidebar() {
 }
 
 // ─── NAVIGATION ───
+// NOTE: We use only 'click' events (NOT touchend) because:
+//   1. touch-action:manipulation in CSS already removes the 300ms delay
+//   2. touchend fires before the browser processes z-index, causing overlay to steal the tap
+//   3. click is reliable across all devices once the delay is gone
 function showPage(name, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -25,31 +29,26 @@ function loadPage(name) {
   if (name === 'fees') loadFees();
 }
 
-// Attach nav clicks via JS — avoids inline onclick issues on mobile browsers
-// We bind both 'click' and 'touchend' with a flag to prevent double-firing
+// Wire up nav items and logout after DOM is ready
 document.addEventListener('DOMContentLoaded', function () {
+
+  // Nav items — simple click only (touch-action:manipulation in CSS removes 300ms delay)
   document.querySelectorAll('.sidebar-nav .nav-item').forEach(function (link) {
-    var fired = false;
-
-    function handleNav(e) {
+    link.addEventListener('click', function (e) {
       e.preventDefault();
-      if (fired) return;       // prevent touchend + click double-fire
-      fired = true;
-      setTimeout(function () { fired = false; }, 400);
-      var page = link.getAttribute('data-page');
-      showPage(page, link);
-    }
-
-    link.addEventListener('touchend', handleNav, { passive: false });
-    link.addEventListener('click', handleNav);
+      showPage(link.getAttribute('data-page'), link);
+    });
   });
 
   // Logout button
   var logoutBtn = document.getElementById('logout-btn');
   if (logoutBtn) {
-    logoutBtn.addEventListener('click', doLogout);
-    logoutBtn.addEventListener('touchend', function (e) { e.preventDefault(); doLogout(); });
+    logoutBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      doLogout();
+    });
   }
+
 });
 
 async function doLogout() {

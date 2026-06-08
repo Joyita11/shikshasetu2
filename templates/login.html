@@ -39,7 +39,7 @@
       </div>
 
       <div id="error-msg" class="error-msg" style="display:none"></div>
-      <button class="btn-signin" onclick="doLogin()">Sign In →</button>
+      <button class="btn-signin" id="signin-btn">Sign In →</button>
       <p class="auth-footer">Don't have an account? <a href="/signup">Sign Up</a></p>
     </div>
   </div>
@@ -70,6 +70,9 @@
         err.textContent = data.error || 'Login failed.'; err.style.display = 'block';
       }
     }
+
+    // Wire Sign In via addEventListener so it works on mobile (no inline onclick)
+    document.getElementById('signin-btn').addEventListener('click', doLogin);
     document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
   </script>
 </body>
