@@ -234,16 +234,17 @@ async function loadFees() {
     // Online payment — only shown when teacher has a UPI ID set and fee is unpaid
     let payOnlineBtn = '';
     if (!isPaid && teacherUpi) {
-      // UPI deep link — opens GPay / PhonePe / any UPI app on mobile
-      // upi://pay?pa=UPI_ID&pn=NAME&am=AMOUNT&cu=INR&tn=NOTE
-      const upiNote = encodeURIComponent(`Tuition fee ${f.month} ${f.year}`);
-      const upiLink = `upi://pay?pa=${encodeURIComponent(teacherUpi)}&pn=${encodeURIComponent(teacherName)}&am=${Number(f.amount).toFixed(2)}&cu=INR&tn=${upiNote}`;
+      // Store payment data as data attributes on the button — avoids escaping issues in onclick strings
+      // The actual URL is built in openUpiPayment() at click time based on the device
       payOnlineBtn = `
-        <a href="${upiLink}"
-          style="display:inline-flex;align-items:center;gap:6px;background:#1a73e8;color:#fff;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;text-decoration:none;margin-top:6px;touch-action:manipulation"
-          onclick="handleUpiClick(event, '${upiLink}')">
+        <button class="btn-pay-online"
+          data-upi="${escHtml(teacherUpi)}"
+          data-name="${escHtml(teacherName)}"
+          data-amount="${Number(f.amount).toFixed(2)}"
+          data-note="${escHtml('Tuition fee ' + f.month + ' ' + f.year)}"
+          onclick="openUpiPayment(this)">
           📲 Pay Online
-        </a>`;
+        </button>`;
     }
 
     return `
@@ -251,7 +252,7 @@ async function loadFees() {
       <td data-label="Month">${escHtml(f.month)}</td>
       <td data-label="Year">${f.year}</td>
       <td data-label="Status">${statusBadge}</td>
-      <td data-label="Action" style="display:flex;flex-direction:column;gap:4px;align-items:flex-start">
+      <td data-label="Action" style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">
         ${markPaidBtn}
         ${payOnlineBtn}
       </td>
@@ -260,15 +261,36 @@ async function loadFees() {
   }).join('');
 }
 
-// UPI deep links only work on mobile (where UPI apps are installed).
-// On desktop, show a friendly message instead of a broken link.
-function handleUpiClick(e, upiLink) {
-  const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-  if (!isMobile) {
-    e.preventDefault();
-    alert('📲 UPI payment works on mobile only.\nOpen this page on your phone to pay via GPay, PhonePe, or any UPI app.');
+// ── UPI Payment handler ──
+// Uses intent:// scheme on Android — this bypasses the "blocked by authorities"
+// error that GPay/PhonePe show when upi:// is opened from a browser WebView.
+// Uses upi:// on iOS (intent:// is Android-only).
+// Shows a desktop fallback message with the UPI ID to pay manually.
+function openUpiPayment(btn) {
+  const upiId = btn.getAttribute('data-upi');
+  const name = btn.getAttribute('data-name');
+  const amount = btn.getAttribute('data-amount');
+  const note = btn.getAttribute('data-note');
+
+  const ua = navigator.userAgent;
+  const isAndroid = /Android/i.test(ua);
+  const isIOS = /iPhone|iPad/i.test(ua);
+
+  if (isAndroid) {
+    // intent:// scheme — Android opens the UPI app chooser directly
+    // without the WebView payment-blocked restriction
+    const intentUrl = `intent://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(name)}&am=${encodeURIComponent(amount)}&cu=INR&tn=${encodeURIComponent(note)}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+    window.location.href = intentUrl;
+
+  } else if (isIOS) {
+    // Standard upi:// works fine on iOS (no WebView block)
+    const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(name)}&am=${encodeURIComponent(amount)}&cu=INR&tn=${encodeURIComponent(note)}`;
+    window.location.href = upiUrl;
+
+  } else {
+    // Desktop — UPI apps aren't installed, show the details to pay manually
+    alert(`📲 UPI payment is mobile-only.\n\nTo pay ₹${amount}, open GPay / PhonePe on your phone and send to:\n\nUPI ID: ${upiId}\nName: ${name}\nAmount: ₹${amount}\nNote: ${note}`);
   }
-  // On mobile — let the default href open the UPI app directly
 }
 
 async function markPaid(feeId) {
