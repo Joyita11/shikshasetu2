@@ -1,4 +1,5 @@
 // ─── NAVIGATION ───
+// Using event delegation instead of inline onclick — works reliably on mobile touch
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
   document.getElementById('overlay').classList.toggle('active');
@@ -24,6 +25,33 @@ function loadPage(name) {
   if (name === 'tasks') loadTasks();
   if (name === 'fees') loadFees();
 }
+
+// Attach nav clicks via JS — avoids inline onclick issues on mobile browsers
+// We bind both 'click' and 'touchend' with a flag to prevent double-firing
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('.sidebar-nav .nav-item').forEach(function (link) {
+    var fired = false;
+
+    function handleNav(e) {
+      e.preventDefault();
+      if (fired) return;       // prevent touchend + click double-fire
+      fired = true;
+      setTimeout(function () { fired = false; }, 400);
+      var page = link.getAttribute('data-page');
+      showPage(page, link);
+    }
+
+    link.addEventListener('touchend', handleNav, { passive: false });
+    link.addEventListener('click', handleNav);
+  });
+
+  // Logout button
+  var logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', doLogout);
+    logoutBtn.addEventListener('touchend', function (e) { e.preventDefault(); doLogout(); });
+  }
+});
 
 async function doLogout() {
   await fetch('/api/logout', { method: 'POST' });

@@ -47,11 +47,13 @@ def validate_password(password):
     return True, ''
 
 def generate_student_login_id(teacher_id, student_name):
-    """Auto-generate a unique internal login ID for a student.
-    Format: firstname.teacherXX.RRRR@setu.local — guaranteed unique, never visible to student externally."""
-    name_slug = ''.join(c for c in student_name.lower() if c.isalpha())[:10]
-    rand = ''.join(secrets.choice(string.digits) for _ in range(6))
-    return f"{name_slug}.t{teacher_id}.{rand}@setu.local"
+    """Auto-generate a short, mobile-friendly login ID for a student.
+    Format: firstname + 4 digits, e.g. 'advik3890'
+    Stored as-is (no fake email). Easy to read and type on mobile.
+    The @setu.local suffix is gone — students just type e.g. advik3890"""
+    name_slug = ''.join(c for c in student_name.lower() if c.isalpha())[:8]
+    rand = ''.join(secrets.choice(string.digits) for _ in range(4))
+    return f"{name_slug}{rand}"
 
 def init_db():
     conn = get_db()
@@ -186,9 +188,11 @@ def login():
     conn = get_db()
     c = conn.cursor()
 
+    # Accept either the short login ID (e.g. advik3890) or email address
+    # LOWER() on both sides so capitalisation never causes "Invalid password" errors
     user = c.execute(
         'SELECT * FROM users WHERE LOWER(email)=? AND password=?',
-        (email, hash_password(password))
+        (email.lower(), hash_password(password))
     ).fetchone()
     conn.close()
 

@@ -576,6 +576,11 @@ button {
   font-weight: 500;
   transition: all .2s;
   cursor: pointer;
+  /* Removes the 300ms tap delay on mobile browsers — makes nav feel instant */
+  touch-action: manipulation;
+  /* Prevent text selection on tap */
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .nav-item:hover {
@@ -610,6 +615,10 @@ button {
   font-weight: 600;
   border-radius: var(--radius-sm);
   transition: all .2s;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: pointer;
 }
 
 .logout-btn:hover {
