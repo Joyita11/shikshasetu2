@@ -1,229 +1,1718 @@
-from flask import Flask,
-render_template,
-request,
-jsonify,
-session,
-redirect,
-url_for import sqlite3 import os import hashlib import secrets import string from datetime import datetime,
-timedelta app=Flask(__name__) app.secret_key=os.environ.get('SECRET_KEY', 'shikshasetu_secret_key_2026') # ── SESSION: stay logged in for 30 days ── app.config['SESSION_PERMANENT']=True app.config['PERMANENT_SESSION_LIFETIME']=timedelta(days=30) app.config['SESSION_COOKIE_SAMESITE']='Lax'
-app.config['SESSION_COOKIE_SECURE']=False from whitenoise import WhiteNoise app.wsgi_app=WhiteNoise(app.wsgi_app, root='static/', prefix='static') # ── DB PATH ── DATA_DIR='/data' if os.path.isdir('/data') else os.path.dirname(os.path.abspath(__file__)) DB_PATH=os.path.join(DATA_DIR, 'shikshasetu.db') def get_db(): conn=sqlite3.connect(DB_PATH) conn.row_factory=sqlite3.Row return conn def hash_password(password): return hashlib.sha256(password.encode()).hexdigest() def validate_password(password): "" "Returns (ok, error_message). Rules: 8+ chars, 1 uppercase, 1 lowercase, 1 digit." ""
-if len(password) < 8: return False,
-'Password must be at least 8 characters'
-if not any(c.isupper() for c in password): return False,
-'Password needs at least one uppercase letter (A-Z)'
-if not any(c.islower() for c in password): return False,
-'Password needs at least one lowercase letter (a-z)'
-if not any(c.isdigit() for c in password): return False,
-'Password needs at least one number (0-9)'
-return True,
-''
+/* ═══════════════════════════════════════════════════════
+   SHIKSHASETU — "Morning Scholar" Design System
+   Warm amber + deep teal + cream | Large accessible type
+   Base font: 18px | Google Fonts: Fraunces + DM Sans
+═══════════════════════════════════════════════════════ */
 
-def generate_student_login_id(teacher_id, student_name): name_slug='' .join(c for c in student_name.lower() if c.isalpha())[:8] rand='' .join(secrets.choice(string.digits) for _ in range(4)) return f"{name_slug}{rand}"
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,400&family=DM+Sans:wght@400;500;600;700&display=swap');
 
-def init_db(): conn=get_db() c=conn.cursor() c.execute('' 'CREATE TABLE IF NOT EXISTS users (
- id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  email TEXT UNIQUE NOT NULL,
-  password TEXT NOT NULL,
-  role TEXT NOT NULL CHECK(role IN ('teacher', 'student')),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)'' ')
+/* ─── TOKENS ─── */
+:root {
+  --teal: #0e6b6b;
+  --teal-dark: #094f4f;
+  --teal-light: #e0f4f4;
+  --amber: #d97706;
+  --amber-light: #fef3c7;
+  --amber-mid: #f59e0b;
+  --cream: #fdf8f0;
+  --cream-2: #f5ede0;
+  --sand: #e8d5bc;
+  --ink: #1a1a18;
+  --ink-2: #3d3d38;
+  --ink-3: #6b6b62;
+  --white: #ffffff;
+  --red: #dc2626;
+  --red-light: #fee2e2;
+  --green: #15803d;
+  --green-light: #dcfce7;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, .08);
+  --shadow-md: 0 6px 24px rgba(0, 0, 0, .12);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, .16);
+  --radius: 16px;
+  --radius-lg: 24px;
+  --radius-sm: 10px;
+}
 
-try: c.execute('ALTER TABLE users ADD COLUMN upi_id TEXT DEFAULT ""') except Exception: pass c.execute('' 'CREATE TABLE IF NOT EXISTS students (
- id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id INTEGER REFERENCES users(id),
-  teacher_id INTEGER REFERENCES users(id),
-  class TEXT,
-  batch TEXT,
-  school TEXT,
-  fees REAL DEFAULT 0,
-  joined_date TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)'' ')
+/* ─── RESET ─── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
-c.execute('' 'CREATE TABLE IF NOT EXISTS doubts (
- id INTEGER PRIMARY KEY AUTOINCREMENT,
-  student_id INTEGER REFERENCES users(id),
-  teacher_id INTEGER REFERENCES users(id),
-  subject TEXT,
-  question TEXT,
-  answer TEXT,
-  status TEXT DEFAULT 'pending',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)'' ')
+html {
+  scroll-behavior: smooth;
+}
 
-c.execute('' 'CREATE TABLE IF NOT EXISTS tasks (
- id INTEGER PRIMARY KEY AUTOINCREMENT,
-  student_id INTEGER REFERENCES users(id),
-  teacher_id INTEGER REFERENCES users(id),
-  title TEXT,
-  study_material TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)'' ')
+body {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 18px;
+  line-height: 1.6;
+  color: var(--ink);
+  overflow-x: hidden;
+  background: var(--cream);
+}
 
-c.execute('' 'CREATE TABLE IF NOT EXISTS task_items (
- id INTEGER PRIMARY KEY AUTOINCREMENT,
-  task_id INTEGER REFERENCES tasks(id),
-  description TEXT,
-  completed INTEGER DEFAULT 0)'' ')
+a {
+  text-decoration: none;
+  color: inherit;
+}
 
-c.execute('' 'CREATE TABLE IF NOT EXISTS fees (
- id INTEGER PRIMARY KEY AUTOINCREMENT,
-  student_id INTEGER REFERENCES users(id),
-  teacher_id INTEGER REFERENCES users(id),
-  month TEXT,
-  year INTEGER,
-  status TEXT DEFAULT 'unpaid',
-  amount REAL DEFAULT 0,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)'' ')
+img {
+  display: block;
+  max-width: 100%;
+}
+
+button {
+  font-family: inherit;
+  touch-action: manipulation;
+  /* removes 300ms tap delay on ALL buttons sitewide */
+}
 
 
-conn.commit() conn.close() # ─────────────────────────── AUTH ─────────────────────────── @app.route('/') def index(): role=session.get('user_role') if role=='teacher': return redirect('/teacher') if role=='student': return redirect('/student') return render_template('landing.html') @app.route('/login', methods=['GET']) def login_page(): role=session.get('user_role') if role=='teacher': return redirect('/teacher') if role=='student': return redirect('/student') return render_template('login.html') @app.route('/signup', methods=['GET']) def signup_page(): return render_template('signup.html') @app.route('/api/signup', methods=['POST']) def signup(): data=request.json name=data.get('name', '').strip() email=data.get('email', '').strip() password=data.get('password', '') role=data.get('role', '') if not all([name, email, password, role]): return jsonify({
-  'error': 'All fields required'
+/* ══════════════════════════════════════════
+   LANDING PAGE
+══════════════════════════════════════════ */
 
-}),
-400 if role=='teacher': ok,
-msg=validate_password(password) if not ok: return jsonify({
-  'error': msg
+.landing-body {
+  background: var(--ink);
+  color: var(--white);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
 
-}),
-400 conn=get_db() c=conn.cursor() try: c.execute('INSERT INTO users (name, email, password, role) VALUES (?,?,?,?)',
-  (name, email, hash_password(password), role)) conn.commit() return jsonify({
-  'success': True
+/* ── Nav ── */
+.landing-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 48px;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+  position: sticky;
+  top: 0;
+  background: rgba(26, 26, 24, .95);
+  backdrop-filter: blur(12px);
+  z-index: 50;
+  flex-wrap: wrap;
+  gap: 12px;
+}
 
-}) except sqlite3.IntegrityError: return jsonify({
-  'error': 'Email already exists'
+.logo {
+  font-family: 'Fraunces', serif;
+  font-size: 26px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--amber-mid);
+}
 
-}),
-400 finally: conn.close() @app.route('/api/login', methods=['POST']) def login(): data=request.json email=data.get('email', '').strip().lower() password=data.get('password', '') role=data.get('role', '') conn=get_db() c=conn.cursor() user=c.execute('SELECT * FROM users WHERE LOWER(email)=? AND password=?',
-  (email.lower(), hash_password(password))).fetchone() conn.close() if not user: return jsonify({
-  'error': 'Invalid email or password'
+.logo-icon {
+  font-size: 28px;
+}
 
-}),
-401 if user['role'] !=role: return jsonify({
-  'error': f'This account is registered as a {user["role"]}, not {role}'
+.btn-outline {
+  border: 2px solid rgba(255, 255, 255, .3);
+  color: var(--white);
+  padding: 10px 24px;
+  border-radius: 50px;
+  font-size: 16px;
+  font-weight: 600;
+  margin-right: 10px;
+  transition: all .2s;
+}
 
-}),
-401 session.permanent=True session['user_id']=user['id'] session['user_name']=user['name'] session['user_role']=user['role'] session['user_email']=user['email'] return jsonify({
-  'success': True, 'role': user['role'], 'name': user['name']
+.btn-outline:hover {
+  border-color: var(--amber-mid);
+  color: var(--amber-mid);
+}
 
-}) @app.route('/api/logout', methods=['POST']) def logout(): session.clear() return jsonify({
-  'success': True
+.btn-primary-sm {
+  background: var(--amber);
+  color: var(--white);
+  padding: 10px 24px;
+  border-radius: 50px;
+  font-size: 16px;
+  font-weight: 700;
+  transition: all .2s;
+}
 
-}) @app.route('/api/me') def me(): if 'user_id' not in session: return jsonify({
-  'error': 'Not logged in'
+.btn-primary-sm:hover {
+  background: var(--amber-mid);
+  transform: translateY(-1px);
+}
 
-}),
-401 return jsonify({
-  'id': session['user_id'],
-  'name': session['user_name'],
-  'role': session['user_role'],
-  'email': session['user_email']
-}) # ─────────────────────────── TEACHER ─────────────────────────── @app.route('/teacher') def teacher_dashboard(): if session.get('user_role') !='teacher': return redirect('/') return render_template('teacher.html') @app.route('/api/teacher/stats') def teacher_stats(): uid=session.get('user_id') conn=get_db() c=conn.cursor() total_students=c.execute('SELECT COUNT(*) FROM students WHERE teacher_id=?', (uid, )).fetchone()[0] batches_raw=c.execute('SELECT DISTINCT batch FROM students WHERE teacher_id=? AND batch IS NOT NULL', (uid, )).fetchall() active_batches=len([b for b in batches_raw if b['batch']]) pending_fees_students=c.execute('' '
- SELECT COUNT(DISTINCT student_id) FROM fees WHERE teacher_id=? AND status="unpaid"
-  '' ', (uid,)).fetchone()[0]
+/* ── Hero ── */
+.hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(48px, 8vw, 100px) clamp(24px, 6vw, 80px);
+  gap: 48px;
+  flex-wrap: wrap;
+  overflow-x: hidden;
+}
+
+.hero-left {
+  max-width: 600px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(217, 119, 6, .2);
+  color: var(--amber-mid);
+  border: 1px solid rgba(217, 119, 6, .4);
+  padding: 8px 20px;
+  border-radius: 50px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  margin-bottom: 28px;
+}
+
+.hero-left h1 {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(52px, 7vw, 88px);
+  font-weight: 800;
+  line-height: 1.05;
+  margin-bottom: 24px;
+  background: linear-gradient(135deg, #fff 0%, var(--amber-mid) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-left p {
+  font-size: 19px;
+  color: rgba(255, 255, 255, .7);
+  line-height: 1.75;
+  margin-bottom: 40px;
+  max-width: 500px;
+}
+
+.btn-hero {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--amber);
+  color: var(--white);
+  padding: 18px 40px;
+  border-radius: 50px;
+  font-size: 18px;
+  font-weight: 700;
+  transition: all .25s;
+  box-shadow: 0 8px 32px rgba(217, 119, 6, .4);
+}
+
+.btn-hero:hover {
+  background: var(--amber-mid);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 40px rgba(217, 119, 6, .5);
+}
+
+.hero-right {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  min-width: 280px;
+}
+
+.hero-img-frame {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, .12);
+  max-width: 520px;
+  width: 100%;
+  position: relative;
+  box-shadow: var(--shadow-lg);
+}
+
+.hero-img-frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 50%, rgba(217, 119, 6, .2) 100%);
+  pointer-events: none;
+}
+
+.hero-img-frame img {
+  width: 100%;
+}
+
+/* ── Features ── */
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px;
+  padding: clamp(40px, 6vw, 80px) clamp(24px, 6vw, 80px);
+  background: rgba(255, 255, 255, .03);
+  border-top: 1px solid rgba(255, 255, 255, .06);
+}
+
+.feature-card {
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: var(--radius);
+  padding: 36px 28px;
+  transition: all .25s;
+}
+
+.feature-card:hover {
+  background: rgba(255, 255, 255, .08);
+  border-color: var(--amber-mid);
+  transform: translateY(-4px);
+}
+
+.feature-icon {
+  font-size: 44px;
+  margin-bottom: 16px;
+}
+
+.feature-card h3 {
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: var(--amber-mid);
+}
+
+.feature-card p {
+  color: rgba(255, 255, 255, .65);
+  font-size: 16px;
+  line-height: 1.65;
+}
 
 
-  doubts=c.execute('SELECT COUNT(*) FROM doubts WHERE teacher_id=? AND status="pending"', (uid, )).fetchone()[0] conn.close() return jsonify({
-    'total_students': total_students,
-    'active_batches': active_batches,
-    'pending_fees_students': pending_fees_students,
-    'doubts': doubts
+/* ══════════════════════════════════════════
+   AUTH PAGES
+══════════════════════════════════════════ */
 
-  }) @app.route('/api/teacher/students', methods=['GET']) def get_students(): uid=session.get('user_id') conn=get_db() c=conn.cursor() rows=c.execute('' '
- SELECT s.id, u.name, s.class, s.batch, s.school, s.fees, s.joined_date, s.user_id FROM students s JOIN users u ON s.user_id=u.id WHERE s.teacher_id=? '' ', (uid,)).fetchall()
- conn.close() return jsonify([dict(r) for r in rows]) @app.route('/api/teacher/students', methods=['POST']) def add_student(): uid=session.get('user_id') data=request.json conn=get_db() c=conn.cursor() name=data.get('name', '').strip() if not name: conn.close() return jsonify({
-    'error': 'Student name is required'
+.auth-body {
+  min-height: 100vh;
+  display: flex;
+  background: var(--cream);
+}
 
-  }), 400 raw_password=data.get('password', '').strip() if raw_password: ok, msg=validate_password(raw_password) if not ok: conn.close() return jsonify({
-  'error': msg
+.auth-bg {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 40%, rgba(14, 107, 107, .15) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 80% 70%, rgba(217, 119, 6, .12) 0%, transparent 60%),
+    var(--cream);
+}
 
-}), 400 else: chars=string.ascii_letters + string.digits raw_password=(secrets.choice(string.ascii_uppercase) + secrets.choice(string.digits) + '' .join(secrets.choice(chars) for _ in range(8))) lst=list(raw_password) secrets.SystemRandom().shuffle(lst) raw_password='' .join(lst) login_id=generate_student_login_id(uid, name) while c.execute('SELECT id FROM users WHERE email=?', (login_id, )).fetchone(): login_id=generate_student_login_id(uid, name) try: c.execute('INSERT INTO users (name, email, password, role) VALUES (?,?,?,?)',
-  (name, login_id, hash_password(raw_password), 'student')) student_user_id=c.lastrowid except sqlite3.IntegrityError: conn.close() return jsonify({
-  'error': 'Could not create student, please try again'
+.auth-card {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 48px 44px;
+  width: 100%;
+  max-width: 460px;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--sand);
+}
 
-}), 400 # Safely parse fees incase empty string is provided fees_val=data.get('fees', 0) try: fees_float=float(fees_val) if fees_val !='' else 0.0 except ValueError: fees_float=0.0 c.execute('' 'INSERT INTO students (user_id, teacher_id, class, batch, school, fees, joined_date)
- VALUES (?, ?, ?, ?, ?, ?, ?)'' ',
-(student_user_id, uid, data.get('class', ''), data.get('batch', ''),
-    data.get('school', ''), fees_float,
-    data.get('joined_date', '') or datetime.now().strftime('%Y-%m-%d'))) conn.commit() conn.close() return jsonify({
-  'success': True, 'login_id': login_id, 'password': raw_password
+.auth-logo {
+  font-family: 'Fraunces', serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--teal);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 32px;
+}
 
-}) @app.route('/api/teacher/students/<int:sid>', methods=['PUT']) def update_student(sid): uid=session.get('user_id') data=request.json conn=get_db() c=conn.cursor() stu=c.execute('SELECT user_id FROM students WHERE id=? AND teacher_id=?', (sid, uid)).fetchone() if not stu: conn.close() return jsonify({
-  'error': 'Not found'
+.auth-card h2 {
+  font-family: 'Fraunces', serif;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
 
-}), 404 fees_val=data.get('fees', 0) try: fees_float=float(fees_val) if fees_val !='' else 0.0 except ValueError: fees_float=0.0 c.execute('UPDATE users SET name=? WHERE id=?', (data['name'], stu['user_id'])) c.execute('' 'UPDATE students SET class=?, batch=?, school=?, fees=?, joined_date=? WHERE id=?' '',
-  (data.get('class', ''), data.get('batch', ''), data.get('school', ''),
-    fees_float,
-    data.get('joined_date', '') or datetime.now().strftime('%Y-%m-%d'),
-    sid)) conn.commit() conn.close() return jsonify({
-  'success': True
+.auth-sub {
+  color: var(--ink-3);
+  font-size: 17px;
+  margin-bottom: 32px;
+}
 
-}) @app.route('/api/teacher/students/<int:sid>', methods=['DELETE']) def delete_student(sid): uid=session.get('user_id') conn=get_db() c=conn.cursor() row=c.execute('SELECT user_id FROM students WHERE id=? AND teacher_id=?', (sid, uid)).fetchone() if not row: conn.close() return jsonify({
-  'error': 'Student not found'
+/* ── Form elements ── */
+.form-group {
+  margin-bottom: 22px;
+}
 
-}), 404 student_uid=row['user_id'] c.execute('DELETE FROM fees   WHERE student_id=? AND teacher_id=?', (student_uid, uid)) c.execute('DELETE FROM doubts WHERE student_id=? AND teacher_id=?', (student_uid, uid)) task_ids=[r[0] for r in c.execute('SELECT id FROM tasks WHERE student_id=? AND teacher_id=?', (student_uid, uid)).fetchall()] for tid in task_ids: c.execute('DELETE FROM task_items WHERE task_id=?', (tid, )) c.execute('DELETE FROM tasks WHERE student_id=? AND teacher_id=?', (student_uid, uid)) c.execute('DELETE FROM students WHERE id=? AND teacher_id=?', (sid, uid)) c.execute('DELETE FROM users WHERE id=?', (student_uid, )) conn.commit() conn.close() return jsonify({
-  'success': True
+.form-group label {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink-2);
+  margin-bottom: 8px;
+  letter-spacing: .3px;
+}
 
-}) @app.route('/api/teacher/doubts') def teacher_doubts(): uid=session.get('user_id') conn=get_db() c=conn.cursor() rows=c.execute('' '
- SELECT d.*, u.name as student_name FROM doubts d JOIN users u ON d.student_id=u.id WHERE d.teacher_id=? ORDER BY d.created_at DESC '' ', (uid,)).fetchall()
- conn.close() return jsonify([dict(r) for r in rows]) @app.route('/api/teacher/doubts/<int:did>/answer', methods=['POST']) def answer_doubt(did): uid=session.get('user_id') data=request.json conn=get_db() c=conn.cursor() c.execute('UPDATE doubts SET answer=?, status="solved" WHERE id=? AND teacher_id=?',
-    (data['answer'], did, uid)) conn.commit() conn.close() return jsonify({
-    'success': True
-  }) @app.route('/api/teacher/tasks', methods=['GET']) def teacher_tasks(): uid=session.get('user_id') conn=get_db() c=conn.cursor() rows=c.execute('' '
- SELECT t.id, t.student_id, u.name as student_name, t.title, t.study_material, t.created_at,
-  s.batch FROM tasks t JOIN users u ON t.student_id=u.id JOIN students s ON s.user_id=t.student_id AND s.teacher_id=t.teacher_id WHERE t.teacher_id=? ORDER BY t.created_at DESC '' ', (uid,)).fetchall()
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 16px 18px;
+  border: 2px solid var(--sand);
+  border-radius: var(--radius-sm);
+  font-size: 17px;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--cream);
+  color: var(--ink);
+  transition: border .2s, box-shadow .2s;
+  outline: none;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 4px rgba(14, 107, 107, .1);
+  background: var(--white);
+}
+
+.form-row {
+  display: flex;
+  gap: 14px;
+}
+
+.form-row .form-group {
+  flex: 1;
+}
+
+.btn-signin {
+  width: 100%;
+  padding: 18px;
+  background: var(--teal);
+  color: var(--white);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 18px;
+  font-weight: 700;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all .2s;
+  margin-bottom: 18px;
+  letter-spacing: .3px;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.btn-signin:hover {
+  background: var(--teal-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(14, 107, 107, .3);
+}
+
+.auth-footer {
+  text-align: center;
+  color: var(--ink-3);
+  font-size: 16px;
+}
+
+.auth-footer a {
+  color: var(--teal);
+  font-weight: 700;
+}
+
+.auth-footer a:hover {
+  text-decoration: underline;
+}
+
+.error-msg {
+  color: var(--red);
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  background: var(--red-light);
+  border-radius: 8px;
+}
+
+.success-msg {
+  color: var(--green);
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  background: var(--green-light);
+  border-radius: 8px;
+}
+
+/* ── Password strength ── */
+.pw-wrap {
+  position: relative;
+}
+
+.pw-wrap input {
+  padding-right: 52px;
+}
+
+.pw-eye {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 22px;
+  color: var(--ink-3);
+  padding: 0;
+}
+
+.pw-eye:hover {
+  color: var(--teal);
+}
+
+.strength-bar {
+  display: flex;
+  gap: 5px;
+  margin-top: 10px;
+  height: 7px;
+}
+
+.strength-bar span {
+  flex: 1;
+  border-radius: 4px;
+  background: var(--sand);
+  transition: background .25s;
+}
+
+.strength-label {
+  font-size: 14px;
+  margin-top: 6px;
+  font-weight: 700;
+}
+
+.rule-list {
+  font-size: 15px;
+  color: var(--ink-3);
+  margin-top: 10px;
+  padding-left: 4px;
+  list-style: none;
+}
+
+.rule-list li {
+  margin-bottom: 5px;
+}
+
+.rule-list li.ok {
+  color: var(--green);
+}
+
+.rule-list li.ok::before {
+  content: '✔  ';
+}
+
+.rule-list li:not(.ok)::before {
+  content: '✖  ';
+  color: var(--red);
+}
 
 
-  result=[] for r in rows: items=c.execute('SELECT * FROM task_items WHERE task_id=?', (r['id'], )).fetchall() d=dict(r) d['items']=[dict(i) for i in items] result.append(d) conn.close() return jsonify(result) @app.route('/api/teacher/tasks', methods=['POST']) def create_task(): uid=session.get('user_id') data=request.json conn=get_db() c=conn.cursor() c.execute('INSERT INTO tasks (student_id, teacher_id, title, study_material) VALUES (?,?,?,?)',
-    (data['student_id'], uid, data.get('title', ''), data.get('study_material', ''))) task_id=c.lastrowid for item in data.get('items', []): if item.strip(): c.execute('INSERT INTO task_items (task_id, description) VALUES (?,?)', (task_id, item)) conn.commit() conn.close() return jsonify({
-    'success': True
-  }) @app.route('/api/teacher/fees') def teacher_fees(): uid=session.get('user_id') conn=get_db() c=conn.cursor() students=c.execute('' '
- SELECT s.id as student_id, u.name, s.class, s.batch, s.fees, s.user_id FROM students s JOIN users u ON s.user_id=u.id WHERE s.teacher_id=? '' ', (uid,)).fetchall()
+/* ══════════════════════════════════════════
+   APP LAYOUT (Teacher + Student dashboards)
+══════════════════════════════════════════ */
+
+.app-body {
+  display: flex;
+  min-height: 100vh;
+  background: var(--cream);
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* ─── SIDEBAR ─── */
+.sidebar {
+  width: 280px;
+  min-height: 100vh;
+  background: var(--teal-dark);
+  display: flex;
+  flex-direction: column;
+  padding: 28px 18px;
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 250;
+  /* ABOVE the overlay (150) and hamburger (200) so nav links are tappable */
+  box-shadow: 4px 0 24px rgba(0, 0, 0, .15);
+}
+
+.sidebar-logo {
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--amber-mid);
+  padding: 10px 14px;
+  margin-bottom: 28px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar-nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-radius: var(--radius-sm);
+  color: rgba(255, 255, 255, .7);
+  font-size: 17px;
+  font-weight: 500;
+  transition: all .2s;
+  cursor: pointer;
+  /* Removes the 300ms tap delay on mobile browsers — makes nav feel instant */
+  touch-action: manipulation;
+  /* Prevent text selection on tap */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, .1);
+  color: var(--white);
+}
+
+.nav-item.active {
+  background: var(--amber);
+  color: var(--white);
+  font-weight: 700;
+  box-shadow: 0 4px 16px rgba(217, 119, 6, .4);
+}
+
+.nav-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.sidebar-logout {
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, .1);
+}
+
+.logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  color: rgba(255, 100, 100, .8);
+  font-size: 17px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  transition: all .2s;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: pointer;
+}
+
+.logout-btn:hover {
+  background: rgba(220, 38, 38, .15);
+  color: #fca5a5;
+}
+
+/* ─── STUDENT SIDEBAR variant ─── */
+.student-sidebar {
+  background: #0a4545;
+}
+
+.student-sidebar .nav-item.active {
+  background: var(--teal);
+}
+
+/* ─── MAIN CONTENT ─── */
+.main-content {
+  margin-left: 280px;
+  flex: 1;
+  padding: 36px 40px;
+  min-height: 100vh;
+  min-width: 0;
+  max-width: calc(100vw - 280px);
+  overflow-x: hidden;
+}
+
+.page {
+  display: none;
+}
+
+.page.active {
+  display: block;
+}
+
+/* ─── PAGE HEADER ─── */
+.page-title {
+  font-family: 'Fraunces', serif;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+
+.page-sub {
+  color: var(--ink-3);
+  font-size: 17px;
+  margin-bottom: 28px;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 28px;
+  gap: 16px;
+}
+
+/* ─── HERO BANNER ─── */
+.hero-banner {
+  background: linear-gradient(135deg, var(--teal-dark) 0%, var(--teal) 60%, #0d8a8a 100%);
+  border-radius: var(--radius-lg);
+  padding: 40px 44px;
+  color: var(--white);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  overflow: hidden;
+  position: relative;
+}
+
+.hero-banner::before {
+  content: '';
+  position: absolute;
+  right: -40px;
+  top: -40px;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .06);
+}
+
+.hero-banner h2 {
+  font-family: 'Fraunces', serif;
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.hero-banner p {
+  opacity: .8;
+  font-size: 17px;
+}
+
+/* ─── STATS GRID ─── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 22px;
+  margin-bottom: 32px;
+}
+
+.stat-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 28px 24px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--sand);
+  transition: box-shadow .2s, transform .2s;
+}
+
+.stat-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.stat-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.stat-icon.blue {
+  background: #dbeafe;
+}
+
+.stat-icon.green {
+  background: #dcfce7;
+}
+
+.stat-icon.red {
+  background: #fee2e2;
+  color: var(--red);
+  font-weight: 800;
+  font-size: 20px;
+}
+
+.stat-icon.yellow {
+  background: var(--amber-light);
+}
+
+.stat-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-3);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.stat-value {
+  font-family: 'Fraunces', serif;
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.1;
+}
+
+/* ─── QUOTE BANNER ─── */
+.quote-banner {
+  background: linear-gradient(135deg, var(--teal-dark), #0d8a8a);
+  border-radius: var(--radius-lg);
+  padding: 36px 40px;
+  color: var(--white);
+  margin-top: 28px;
+  position: relative;
+  overflow: hidden;
+}
+
+.quote-banner::after {
+  content: '"';
+  position: absolute;
+  right: 32px;
+  bottom: -20px;
+  font-family: 'Fraunces', serif;
+  font-size: 160px;
+  opacity: .08;
+  line-height: 1;
+}
+
+#quote-text {
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-style: italic;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+#quote-author {
+  font-size: 15px;
+  opacity: .75;
+  font-weight: 600;
+}
+
+/* ─── BUTTONS ─── */
+.btn-dark {
+  background: var(--teal);
+  color: var(--white);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all .2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-dark:hover {
+  background: var(--teal-dark);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-blue {
+  background: #2563eb;
+  color: var(--white);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 14px 24px;
+  font-size: 17px;
+  font-weight: 700;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all .2s;
+}
+
+.btn-blue:hover {
+  background: #1d4ed8;
+}
+
+.btn-outline-small {
+  background: transparent;
+  color: var(--teal);
+  border: 2px solid var(--teal);
+  border-radius: var(--radius-sm);
+  padding: 8px 18px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .2s;
+}
+
+.btn-outline-small:hover {
+  background: var(--teal-light);
+}
+
+.full-width {
+  width: 100%;
+  justify-content: center;
+}
+
+/* ─── DATA TABLE ─── */
+.table-wrap {
+  background: var(--white);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--sand);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table thead {
+  background: var(--teal-dark);
+  color: var(--white);
+}
+
+.data-table th {
+  padding: 16px 18px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.data-table td {
+  padding: 16px 18px;
+  font-size: 16px;
+  border-bottom: 1px solid var(--cream-2);
+  color: var(--ink-2);
+  vertical-align: middle;
+}
+
+.data-table tbody tr:hover {
+  background: var(--cream);
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ─── STUDENT / ACTION CELLS ─── */
+.name-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.student-avatar,
+.doubt-avatar,
+.task-student-avatar-sm {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--teal);
+  color: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.task-student-avatar-sm {
+  width: 48px;
+  height: 48px;
+  font-size: 18px;
+}
+
+.batch-pill {
+  background: var(--amber-light);
+  color: var(--amber);
+  border: 1px solid rgba(217, 119, 6, .3);
+  padding: 4px 14px;
+  border-radius: 50px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  padding: 6px;
+  border-radius: 8px;
+  transition: background .15s;
+}
+
+.action-btn:hover {
+  background: var(--cream-2);
+}
+
+.action-btn.del:hover {
+  background: var(--red-light);
+}
+
+/* ─── DOUBTS ─── */
+.doubts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.doubt-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 24px;
+  border: 1px solid var(--sand);
+  box-shadow: var(--shadow-sm);
+}
+
+.doubt-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.doubt-student-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.doubt-avatar {
+  background: var(--teal);
+}
+
+.doubt-student-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.doubt-student-sub {
+  font-size: 15px;
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+
+.doubt-question {
+  font-family: 'Fraunces', serif;
+  font-size: 18px;
+  font-style: italic;
+  color: var(--ink-2);
+  line-height: 1.6;
+  background: var(--cream);
+  padding: 14px 18px;
+  border-radius: var(--radius-sm);
+  border-left: 4px solid var(--amber);
+}
+
+.doubt-answer {
+  margin-top: 14px;
+  background: var(--green-light);
+  padding: 14px 18px;
+  border-radius: var(--radius-sm);
+  font-size: 16px;
+  color: var(--ink-2);
+  border-left: 4px solid var(--green);
+}
+
+.badge-solved {
+  background: var(--green-light);
+  color: var(--green);
+  padding: 6px 18px;
+  border-radius: 50px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* Student doubt card */
+.doubt-card-student {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 14px;
+  border: 1px solid var(--sand);
+  box-shadow: var(--shadow-sm);
+}
+
+.doubt-status-solved {
+  background: var(--green-light);
+  color: var(--green);
+  padding: 5px 14px;
+  border-radius: 50px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.doubt-status-pending {
+  background: var(--amber-light);
+  color: var(--amber);
+  padding: 5px 14px;
+  border-radius: 50px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* ─── TASKS (assign cards) ─── */
+.tasks-assign-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.task-assign-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 22px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid var(--sand);
+  box-shadow: var(--shadow-sm);
+  gap: 16px;
+  transition: box-shadow .2s;
+}
+
+.task-assign-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+/* ─── TASK MODAL items ─── */
+.task-item-row {
+  margin-bottom: 10px;
+}
+
+.task-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid var(--sand);
+  border-radius: var(--radius-sm);
+  font-size: 16px;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--cream);
+  color: var(--ink);
+}
+
+.task-input:focus {
+  border-color: var(--teal);
+  outline: none;
+  background: var(--white);
+}
+
+.upload-box {
+  border: 2.5px dashed var(--sand);
+  border-radius: var(--radius);
+  padding: 28px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .2s;
+  color: var(--ink-3);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.upload-box:hover {
+  border-color: var(--teal);
+  background: var(--teal-light);
+  color: var(--teal);
+}
+
+/* ─── FEES (teacher month pills) ─── */
+.month-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.month-pill {
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  background: var(--green-light);
+  color: var(--green);
+  cursor: pointer;
+  transition: all .15s;
+  border: 2px solid transparent;
+}
+
+.month-pill:hover {
+  transform: scale(1.08);
+}
+
+.month-pill.pending {
+  background: var(--red-light);
+  color: var(--red);
+  border-color: rgba(220, 38, 38, .2);
+}
+
+/* ─── FEES (student table badges) ─── */
+.fee-status-paid {
+  background: var(--green-light);
+  color: var(--green);
+  padding: 6px 16px;
+  border-radius: 50px;
+  font-size: 14px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fee-status-unpaid {
+  background: var(--red-light);
+  color: var(--red);
+  padding: 6px 16px;
+  border-radius: 50px;
+  font-size: 14px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-mark-paid {
+  background: var(--teal);
+  color: var(--white);
+  border: none;
+  border-radius: 10px;
+  padding: 10px 22px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all .2s;
+  touch-action: manipulation;
+}
+
+.btn-mark-paid:hover {
+  background: var(--teal-dark);
+}
+
+.completed-action {
+  color: var(--green);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* ─── ASSIGNMENT CARDS ─── */
+.assignment-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 28px;
+  margin-bottom: 22px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--sand);
+}
+
+.assignment-status-completed {
+  background: var(--green-light);
+  color: var(--green);
+  padding: 6px 18px;
+  border-radius: 50px;
+  font-size: 14px;
+  font-weight: 700;
+  display: inline-block;
+}
+
+.assignment-status-pending {
+  background: var(--amber-light);
+  color: var(--amber);
+  padding: 6px 18px;
+  border-radius: 50px;
+  font-size: 14px;
+  font-weight: 700;
+  display: inline-block;
+}
+
+.task-check-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+  cursor: pointer;
+  border-bottom: 1px solid var(--cream-2);
+  font-size: 17px;
+}
+
+.task-check-item:last-child {
+  border-bottom: none;
+}
+
+.task-check-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2.5px solid var(--sand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+  transition: all .2s;
+}
+
+.task-check-circle.done {
+  background: var(--green);
+  border-color: var(--green);
+  color: var(--white);
+}
+
+.task-text-done {
+  text-decoration: line-through;
+  color: var(--ink-3);
+}
+
+/* ─── CARD WHITE (student doubt form) ─── */
+.card-white {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 28px;
+  border: 1px solid var(--sand);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ─── MODAL ─── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .5);
+  backdrop-filter: blur(4px);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal-box {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 36px;
+  width: 100%;
+  max-width: 580px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--sand);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.modal-header h3 {
+  font-family: 'Fraunces', serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.modal-close {
+  background: var(--cream-2);
+  border: none;
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 18px;
+  color: var(--ink-3);
+  transition: all .2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close:hover {
+  background: var(--red-light);
+  color: var(--red);
+}
+
+/* ─── HAMBURGER ─── */
+.hamburger {
+  display: none;
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 260;
+  /* above sidebar (250) so it's always tappable */
+  background: var(--teal-dark);
+  border: none;
+  border-radius: 12px;
+  width: 50px;
+  height: 50px;
+  font-size: 22px;
+  color: var(--white);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-md);
+}
+
+/* ─── SIDEBAR OVERLAY ─── */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .5);
+  z-index: 150;
+}
+
+.sidebar-overlay.active {
+  display: block;
+}
 
 
-  result=[] for stu in students: fee_rows=c.execute('' 'SELECT month, year, status FROM fees 
- WHERE student_id=? AND teacher_id=? ORDER BY year,
-    CASE month WHEN "Jan" THEN 1 WHEN "Feb" THEN 2 WHEN "Mar" THEN 3 WHEN "Apr" THEN 4 WHEN "May" THEN 5 WHEN "Jun" THEN 6 WHEN "Jul" THEN 7 WHEN "Aug" THEN 8 WHEN "Sep" THEN 9 WHEN "Oct" THEN 10 WHEN "Nov" THEN 11 WHEN "Dec" THEN 12 END'' ',
-(stu['user_id'], uid)).fetchall() total_due=c.execute('' 'SELECT COALESCE(SUM(amount),0) FROM fees 
- WHERE student_id=? AND teacher_id=? AND status="unpaid" '' ',
-(stu['user_id'], uid)).fetchone()[0] d=dict(stu) d['fee_months']=[dict(f) for f in fee_rows] d['total_due']=total_due result.append(d) conn.close() return jsonify(result) @app.route('/api/teacher/fees', methods=['POST']) def add_fee(): uid=session.get('user_id') data=request.json conn=get_db() c=conn.cursor() stu=c.execute('SELECT fees, user_id FROM students WHERE user_id=? AND teacher_id=?',
-    (data['student_id'], uid)).fetchone() if not stu: conn.close() return jsonify({
-    'error': 'Student not found'
+/* ══════════════════════════════════════════
+   RESPONSIVE — TABLET ≤960px
+══════════════════════════════════════════ */
+@media (max-width: 960px) {
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
 
-  }), 404 existing=c.execute('SELECT id, status FROM fees WHERE student_id=? AND teacher_id=? AND month=? AND year=?',
-  (data['student_id'], uid, data['month'], data['year'])).fetchone() if existing: # If it is paid, make it unpaid again instead of clearing it entirely if existing['status']=='paid': c.execute('UPDATE fees SET status="unpaid" WHERE id=?', (existing['id'], )) else: c.execute('DELETE FROM fees WHERE id=?', (existing['id'], )) else: c.execute('INSERT INTO fees (student_id, teacher_id, month, year, status, amount) VALUES (?,?,?,?,?,?)',
-  (data['student_id'], uid, data['month'], data['year'], 'unpaid', stu['fees'])) conn.commit() conn.close() return jsonify({
-  'success': True
+  .main-content {
+    padding: 28px 24px;
+  }
 
-}) # ─────────────────────────── STUDENT ─────────────────────────── @app.route('/student') def student_dashboard(): if session.get('user_role') !='student': return redirect('/') return render_template('student.html') @app.route('/api/student/info') def student_info(): uid=session.get('user_id') conn=get_db() c=conn.cursor() stu=c.execute('' '
- SELECT s.*, u.name, u.email FROM students s JOIN users u ON s.user_id=u.id WHERE s.user_id=? '' ', (uid,)).fetchone()
- conn.close() if stu: return jsonify(dict(stu)) return jsonify({}) @app.route('/api/student/stats') def student_stats(): uid=session.get('user_id') conn=get_db() c=conn.cursor() pending_items=c.execute('' '
- SELECT COUNT(*) FROM task_items ti JOIN tasks t ON ti.task_id=t.id WHERE t.student_id=? AND ti.completed=0 '' ', (uid,)).fetchone()[0]
+  .modal-box {
+    padding: 28px;
+  }
+}
 
-  completed_items=c.execute('' '
- SELECT COUNT(*) FROM task_items ti JOIN tasks t ON ti.task_id=t.id WHERE t.student_id=? AND ti.completed=1 '' ', (uid,)).fetchone()[0]
+/* ══════════════════════════════════════════
+   RESPONSIVE — MOBILE ≤720px
+══════════════════════════════════════════ */
+@media (max-width: 720px) {
 
-    total_due=c.execute('' 'SELECT COALESCE(SUM(amount),0) FROM fees 
- WHERE student_id=? AND status="unpaid" '' ', (uid,)).fetchone()[0]
+  /* Hamburger + sidebar slide */
+  .hamburger {
+    display: flex;
+  }
 
+  .sidebar {
+    position: fixed;
+    left: -300px;
+    transition: left .3s ease;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, .25);
+  }
 
-      conn.close() return jsonify({
-        'pending_tasks': pending_items,
-        'completed_tasks': completed_items,
-        'total_due': total_due,
-        'fees_status': 'UNPAID' if total_due > 0 else 'PAID'
+  .sidebar.open {
+    left: 0;
+  }
 
-      }) @app.route('/api/student/doubts', methods=['GET']) def student_doubts(): uid=session.get('user_id') conn=get_db() c=conn.cursor() rows=c.execute('SELECT * FROM doubts WHERE student_id=? ORDER BY created_at DESC', (uid, )).fetchall() conn.close() return jsonify([dict(r) for r in rows]) @app.route('/api/student/doubts', methods=['POST']) def post_doubt(): uid=session.get('user_id') data=request.json conn=get_db() c=conn.cursor() stu=c.execute('SELECT teacher_id FROM students WHERE user_id=?', (uid, )).fetchone() if not stu: conn.close() return jsonify({
-      'error': 'No teacher assigned'
+  /* Main content fills screen */
+  .main-content {
+    margin-left: 0;
+    padding: 80px 18px 36px;
+    max-width: 100vw;
+    width: 100%;
+  }
 
-    }), 400 c.execute('INSERT INTO doubts (student_id, teacher_id, subject, question) VALUES (?,?,?,?)',
-    (uid, stu['teacher_id'], data['subject'], data['question'])) conn.commit() conn.close() return jsonify({
-    'success': True
-  }) @app.route('/api/student/assignments') def student_assignments(): uid=session.get('user_id') conn=get_db() c=conn.cursor() tasks=c.execute('SELECT * FROM tasks WHERE student_id=? ORDER BY created_at DESC', (uid, )).fetchall() result=[] for t in tasks: items=c.execute('SELECT * FROM task_items WHERE task_id=?', (t['id'], )).fetchall() d=dict(t) d['items']=[dict(i) for i in items] all_done=all(i['completed'] for i in items) if items else False d['status']='completed' if all_done else 'pending'
+  /* Stats 2-col */
+  .stats-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 14px;
+  }
 
-result.append(d) conn.close() return jsonify(result) @app.route('/api/student/tasks/<int:item_id>/complete', methods=['POST']) def complete_task(item_id): conn=get_db() c=conn.cursor() c.execute('UPDATE task_items SET completed=1 WHERE id=?', (item_id, )) conn.commit() conn.close() return jsonify({
-  'success': True
+  .stat-card {
+    padding: 20px 16px;
+  }
 
-}) @app.route('/api/student/fees') def student_fees(): uid=session.get('user_id') conn=get_db() c=conn.cursor() rows=c.execute('' 'SELECT * FROM fees WHERE student_id=? 
- ORDER BY year DESC,
-  CASE month WHEN "Jan" THEN 1 WHEN "Feb" THEN 2 WHEN "Mar" THEN 3 WHEN "Apr" THEN 4 WHEN "May" THEN 5 WHEN "Jun" THEN 6 WHEN "Jul" THEN 7 WHEN "Aug" THEN 8 WHEN "Sep" THEN 9 WHEN "Oct" THEN 10 WHEN "Nov" THEN 11 WHEN "Dec" THEN 12 END DESC'' ', (uid,)).fetchall()
- conn.close() return jsonify([dict(r) for r in rows]) @app.route('/api/student/fees/<int:fid>/pay', methods=['POST']) def mark_fee_paid(fid): uid=session.get('user_id') conn=get_db() c=conn.cursor() c.execute('UPDATE fees SET status="paid" WHERE id=? AND student_id=?', (fid, uid)) conn.commit() conn.close() return jsonify({
-    'success': True
-  }) if __name__=='__main__': init_db() port=int(os.environ.get('PORT', 5000)) app.run(host='0.0.0.0', port=port, debug=False)
+  .stat-value {
+    font-size: 30px;
+  }
+
+  .stat-label {
+    font-size: 12px;
+  }
+
+  .stat-icon {
+    width: 44px;
+    height: 44px;
+    font-size: 22px;
+  }
+
+  /* Hero banner */
+  .hero-banner {
+    flex-direction: column;
+    padding: 24px 20px;
+    text-align: center;
+    gap: 14px;
+  }
+
+  .hero-banner h2 {
+    font-size: 24px;
+  }
+
+  .hero-banner p {
+    font-size: 15px;
+  }
+
+  .hero-banner img {
+    height: 50px;
+  }
+
+  /* Page title */
+  .page-title {
+    font-size: 26px;
+  }
+
+  .page-header {
+    flex-direction: column;
+    gap: 14px;
+    align-items: stretch;
+  }
+
+  .page-header .btn-dark {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Tables */
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 14px;
+  }
+
+  .data-table {
+    min-width: 560px;
+  }
+
+  .fees-table {
+    min-width: 720px;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 14px 16px;
+    font-size: 15px;
+  }
+
+  /* Modal: bottom sheet */
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal-box {
+    border-radius: 24px 24px 0 0;
+    max-height: 92vh;
+    width: 100%;
+    padding: 28px 20px;
+  }
+
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* Doubt cards */
+  .doubt-card {
+    padding: 18px;
+  }
+
+  .doubt-meta {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  /* Task cards */
+  .task-assign-card {
+    flex-direction: column;
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  .task-assign-card .btn-dark {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Month pills */
+  .month-pills {
+    gap: 6px;
+  }
+
+  .month-pill {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+
+  /* Landing */
+  .landing-nav {
+    padding: 16px 18px;
+  }
+
+  .hero {
+    flex-direction: column;
+    padding: 36px 18px;
+    text-align: center;
+  }
+
+  .hero-left p {
+    margin: 0 auto 36px;
+  }
+
+  .btn-hero {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .hero-img-frame {
+    max-width: 100%;
+  }
+
+  .features {
+    padding: 36px 18px;
+    grid-template-columns: 1fr;
+  }
+
+  /* Quote */
+  .quote-banner {
+    padding: 28px 22px;
+  }
+
+  #quote-text {
+    font-size: 19px;
+  }
+
+  /* Auth */
+  .auth-card {
+    padding: 32px 22px;
+  }
+
+  .auth-card h2 {
+    font-size: 28px;
+  }
+
+  /* Doubts page stacked */
+  #page-doubts>div {
+    flex-direction: column !important;
+  }
+
+  #modal-assign-task .modal-box>div {
+    flex-direction: column;
+  }
+}
+
+/* ══════════════════════════════════════════
+   MOBILE FEE CARDS ≤720px
+══════════════════════════════════════════ */
+@media (max-width: 720px) {
+
+  #fees-tbody-student,
+  #fees-tbody {
+    display: block;
+  }
+
+  #fees-tbody-student tr,
+  #fees-tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    background: var(--white);
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow-sm);
+    gap: 10px;
+    align-items: center;
+    border: 1px solid var(--sand);
+  }
+
+  #fees-tbody-student td,
+  #fees-tbody td {
+    display: flex;
+    flex-direction: column;
+    font-size: 15px;
+    padding: 0;
+    border: none;
+    flex: 1;
+    min-width: 80px;
+  }
+
+  #fees-tbody-student td::before,
+  #fees-tbody td::before {
+    content: attr(data-label);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 4px;
+  }
+
+  #fees-tbody-student td:nth-child(4),
+  #fees-tbody td:nth-child(4) {
+    flex: 100%;
+    margin-top: 6px;
+  }
+
+  #fees-tbody-student td:nth-child(4) .btn-mark-paid,
+  #fees-tbody td:nth-child(4) .btn-mark-paid {
+    width: 100%;
+    text-align: center;
+  }
+
+  .data-table thead {
+    display: none;
+  }
+}
+
+/* ── Small mobile ≤420px ── */
+@media (max-width: 420px) {
+  .main-content {
+    padding: 72px 14px 28px;
+  }
+
+  .stat-value {
+    font-size: 26px;
+  }
+
+  .page-title {
+    font-size: 23px;
+  }
+}

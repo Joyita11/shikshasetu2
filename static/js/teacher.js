@@ -1,4 +1,8 @@
 // ─── NAVIGATION ───
+// NOTE: We use only 'click' events (NOT touchend) because:
+//   1. touch-action:manipulation in CSS already removes the 300ms delay
+//   2. touchend fires before the browser processes z-index, causing overlay to steal the tap
+//   3. click is reliable across all devices once the delay is gone
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
   document.getElementById('overlay').classList.toggle('active');
@@ -25,7 +29,10 @@ function loadPage(name) {
   if (name === 'fees') loadFees();
 }
 
+// Wire up nav items and logout after DOM is ready
 document.addEventListener('DOMContentLoaded', function () {
+
+  // Nav items — simple click only (touch-action:manipulation in CSS removes 300ms delay)
   document.querySelectorAll('.sidebar-nav .nav-item').forEach(function (link) {
     link.addEventListener('click', function (e) {
       e.preventDefault();
@@ -33,6 +40,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
+  // Logout button
   var logoutBtn = document.getElementById('logout-btn');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', function (e) {
@@ -41,6 +49,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  // Task modal — ChatGPT, Google, Send buttons (wired here to avoid inline onclick)
   var chatgptBtn = document.getElementById('task-chatgpt-btn');
   if (chatgptBtn) chatgptBtn.addEventListener('click', function () { openTaskSearch('chatgpt'); });
 
@@ -49,6 +58,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   var sendTasksBtn = document.getElementById('send-tasks-btn');
   if (sendTasksBtn) sendTasksBtn.addEventListener('click', sendTasks);
+
 });
 
 async function doLogout() {
@@ -58,7 +68,7 @@ async function doLogout() {
 
 // ─── DASHBOARD ───
 async function loadDashboard() {
-  const res = await fetch('/api/teacher/stats', { cache: 'no-store' });
+  const res = await fetch('/api/teacher/stats');
   const d = await res.json();
   document.getElementById('stat-students').textContent = d.total_students;
   document.getElementById('stat-batches').textContent = d.active_batches;
@@ -70,7 +80,7 @@ async function loadDashboard() {
 let currentDoubtId = null;
 
 async function loadDoubts() {
-  const res = await fetch('/api/teacher/doubts', { cache: 'no-store' });
+  const res = await fetch('/api/teacher/doubts');
   const doubts = await res.json();
   const container = document.getElementById('doubts-list');
   if (!doubts.length) {
@@ -137,7 +147,7 @@ async function submitAnswer() {
 let editStudentId = null;
 
 async function loadStudents() {
-  const res = await fetch('/api/teacher/students', { cache: 'no-store' });
+  const res = await fetch('/api/teacher/students');
   const students = await res.json();
   const tbody = document.getElementById('students-tbody');
   if (!students.length) {
@@ -168,8 +178,9 @@ function openAddStudent() {
   ['s-name', 's-password', 's-class', 's-school'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('s-fees').value = '';
   document.getElementById('s-batch').value = '1st Batch';
+  // Default joining date to today so teacher only changes it if needed
   document.getElementById('s-joined-date').value = new Date().toISOString().slice(0, 10);
-  document.getElementById('modal-err').style.display = 'none';
+  document.getElementById('modal-err').textContent = '';
   document.getElementById('cred-box').style.display = 'none';
   document.getElementById('modal-add-student').style.display = 'flex';
 }
@@ -183,15 +194,15 @@ function openEditStudent(id, data) {
   document.getElementById('s-batch').value = data.batch || '1st Batch';
   document.getElementById('s-school').value = data.school || '';
   document.getElementById('s-fees').value = data.fees || '';
+  // Populate joining date — fall back to today if not set
   document.getElementById('s-joined-date').value = data.joined_date || new Date().toISOString().slice(0, 10);
-  document.getElementById('modal-err').style.display = 'none';
+  document.getElementById('modal-err').textContent = '';
   document.getElementById('cred-box').style.display = 'none';
   document.getElementById('modal-add-student').style.display = 'flex';
 }
 
 async function saveStudent() {
   const err = document.getElementById('modal-err');
-  err.style.display = 'none';
   err.textContent = '';
   const name = document.getElementById('s-name').value.trim();
   const password = document.getElementById('s-password').value.trim();
@@ -199,13 +210,9 @@ async function saveStudent() {
   const batch = document.getElementById('s-batch').value;
   const school = document.getElementById('s-school').value.trim();
   const fees = document.getElementById('s-fees').value;
-  const joinedDate = document.getElementById('s-joined-date').value;
+  const joinedDate = document.getElementById('s-joined-date').value;  // YYYY-MM-DD
 
-  if (!name) {
-    err.textContent = 'Student name is required.';
-    err.style.display = 'block';
-    return;
-  }
+  if (!name) { err.textContent = 'Student name is required.'; return; }
 
   if (editStudentId) {
     const res = await fetch(`/api/teacher/students/${editStudentId}`, {
@@ -214,13 +221,8 @@ async function saveStudent() {
       body: JSON.stringify({ name, class: cls, batch, school, fees, joined_date: joinedDate })
     });
     const d = await res.json();
-    if (d.success) {
-      closeModal('modal-add-student');
-      loadStudents();
-    } else {
-      err.textContent = d.error || 'Failed to update student.';
-      err.style.display = 'block';
-    }
+    if (d.success) { closeModal('modal-add-student'); loadStudents(); }
+    else err.textContent = d.error || 'Failed.';
   } else {
     const res = await fetch('/api/teacher/students', {
       method: 'POST',
@@ -235,34 +237,23 @@ async function saveStudent() {
       loadStudents();
       loadDashboard();
     } else {
-      err.textContent = d.error || 'Failed to create student.';
-      err.style.display = 'block';
+      err.textContent = d.error || 'Failed.';
     }
   }
 }
 
 async function deleteStudent(id) {
   if (!confirm('Delete this student?')) return;
-  try {
-    const res = await fetch(`/api/teacher/students/${id}`, { method: 'DELETE' });
-    const data = await res.json();
-    if (data.success) {
-      loadStudents();
-      loadDashboard();
-    } else {
-      alert(data.error || 'Failed to delete student.');
-    }
-  } catch (err) {
-    alert('Network error while attempting to delete student.');
-  }
+  await fetch(`/api/teacher/students/${id}`, { method: 'DELETE' });
+  loadStudents(); loadDashboard();
 }
 
 // ─── TASKS ───
 let currentTaskStudentId = null;
-let uploadedFiles = [];
+let uploadedFiles = [];   // array of { name, data } — supports multiple files
 
 async function loadTasks() {
-  const studentsRes = await fetch('/api/teacher/students', { cache: 'no-store' });
+  const studentsRes = await fetch('/api/teacher/students');
   const students = await studentsRes.json();
   const container = document.getElementById('tasks-list');
   if (!students.length) {
@@ -287,7 +278,7 @@ async function loadTasks() {
 
 function openTaskModal(userId, name, batch) {
   currentTaskStudentId = userId;
-  uploadedFiles = [];
+  uploadedFiles = [];   // clear files array on each open
   document.getElementById('task-student-name').textContent = name;
   document.getElementById('task-student-batch').textContent = batch;
   document.getElementById('task-title').value = '';
@@ -309,12 +300,15 @@ function addTaskItem() {
   list.appendChild(row);
 }
 
+// Handle multiple file selection — reads each file as base64 and adds to uploadedFiles[]
 function handleFileUpload(input) {
   const files = Array.from(input.files);
   if (!files.length) return;
 
   files.forEach(file => {
+    // Prevent duplicate names
     if (uploadedFiles.find(f => f.name === file.name)) return;
+
     const reader = new FileReader();
     reader.onload = e => {
       uploadedFiles.push({ name: file.name, data: e.target.result });
@@ -322,9 +316,12 @@ function handleFileUpload(input) {
     };
     reader.readAsDataURL(file);
   });
+
+  // Reset the input so the same file can be re-added after removal
   input.value = '';
 }
 
+// Render the list of uploaded files with individual remove buttons
 function renderUploadedFiles() {
   const list = document.getElementById('uploaded-files-list');
   if (!uploadedFiles.length) {
@@ -332,6 +329,7 @@ function renderUploadedFiles() {
     return;
   }
   list.innerHTML = uploadedFiles.map((f, idx) => {
+    // Truncate long names for display
     const displayName = f.name.length > 30 ? f.name.slice(0, 28) + '…' : f.name;
     const isImg = /\.(png|jpg|jpeg|gif|webp)$/i.test(f.name);
     return `
@@ -344,11 +342,13 @@ function renderUploadedFiles() {
   }).join('');
 }
 
+// Remove a file from the list by index
 function removeFile(idx) {
   uploadedFiles.splice(idx, 1);
   renderUploadedFiles();
 }
 
+// ChatGPT and Google search — uses the title input or a dedicated search field
 function openTaskSearch(engine) {
   const query = document.getElementById('task-search-query').value.trim()
     || document.getElementById('task-title').value.trim()
@@ -373,6 +373,8 @@ async function sendTasks() {
     return;
   }
 
+  // Send uploadedFiles as JSON array (or empty array if none)
+  // study_material is now stored as JSON string: '[{"name":"file.pdf","data":"data:..."}]'
   const res = await fetch('/api/teacher/tasks', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -393,7 +395,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const CUR_YEAR = new Date().getFullYear();
 
 async function loadFees() {
-  const res = await fetch('/api/teacher/fees', { cache: 'no-store' });
+  const res = await fetch('/api/teacher/fees');
   const students = await res.json();
   const tbody = document.getElementById('fees-tbody');
   if (!students.length) {

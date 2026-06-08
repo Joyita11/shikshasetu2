@@ -13,12 +13,15 @@ app.secret_key = os.environ.get('SECRET_KEY', 'shikshasetu_secret_key_2026')
 app.config['SESSION_PERMANENT'] = True
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+# IMPORTANT: Keep False unless you have HTTPS on your custom domain.
+# Render's .onrender.com URLs use HTTPS, but setting True can cause issues
+# with the free tier's redirects. Leave False for now.
 app.config['SESSION_COOKIE_SECURE'] = False
 
 from whitenoise import WhiteNoise
 app.wsgi_app = WhiteNoise(app.wsgi_app, root='static/', prefix='static')
 
-# ── DB PATH ──
+# ── DB PATH: /data on Render (persistent disk), local fallback ──
 DATA_DIR = '/data' if os.path.isdir('/data') else os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(DATA_DIR, 'shikshasetu.db')
 
@@ -29,6 +32,7 @@ def get_db():
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
+
 
 def validate_password(password):
     """Returns (ok, error_message). Rules: 8+ chars, 1 uppercase, 1 lowercase, 1 digit."""
@@ -43,6 +47,10 @@ def validate_password(password):
     return True, ''
 
 def generate_student_login_id(teacher_id, student_name):
+    """Auto-generate a short, mobile-friendly login ID for a student.
+    Format: firstname + 4 digits, e.g. 'advik3890'
+    Stored as-is (no fake email). Easy to read and type on mobile.
+    The @setu.local suffix is gone — students just type e.g. advik3890"""
     name_slug = ''.join(c for c in student_name.lower() if c.isalpha())[:8]
     rand = ''.join(secrets.choice(string.digits) for _ in range(4))
     return f"{name_slug}{rand}"
@@ -60,10 +68,11 @@ def init_db():
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )''')
 
+    # Add upi_id column if it doesn't exist yet (safe migration for existing DBs)
     try:
         c.execute('ALTER TABLE users ADD COLUMN upi_id TEXT DEFAULT ""')
     except Exception:
-        pass 
+        pass  # Column already exists — that's fine
 
     c.execute('''CREATE TABLE IF NOT EXISTS students (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -122,6 +131,9 @@ def init_db():
 
 @app.route('/')
 def index():
+    # ── FIX: If already logged in, skip the landing page and go straight to dashboard ──
+    # This is why users were being asked to login every time — the landing page
+    # never checked the session, so users landed here after every browser open.
     role = session.get('user_role')
     if role == 'teacher':
         return redirect('/teacher')
@@ -131,6 +143,7 @@ def index():
 
 @app.route('/login', methods=['GET'])
 def login_page():
+    # If already logged in, redirect directly to dashboard
     role = session.get('user_role')
     if role == 'teacher':
         return redirect('/teacher')
@@ -153,6 +166,7 @@ def signup():
     if not all([name, email, password, role]):
         return jsonify({'error': 'All fields required'}), 400
 
+    # FIX 3: Validate password strength for teacher self-signup
     if role == 'teacher':
         ok, msg = validate_password(password)
         if not ok:
@@ -180,6 +194,8 @@ def login():
     conn = get_db()
     c = conn.cursor()
 
+    # Accept either the short login ID (e.g. advik3890) or email address
+    # LOWER() on both sides so capitalisation never causes "Invalid password" errors
     user = c.execute(
         'SELECT * FROM users WHERE LOWER(email)=? AND password=?',
         (email.lower(), hash_password(password))
@@ -192,6 +208,7 @@ def login():
     if user['role'] != role:
         return jsonify({'error': f'This account is registered as a {user["role"]}, not {role}'}), 401
 
+    # Set permanent session so it survives browser restarts
     session.permanent = True
     session['user_id']    = user['id']
     session['user_name']  = user['name']
@@ -248,6 +265,7 @@ def teacher_stats():
         'doubts': doubts
     })
 
+# Students
 @app.route('/api/teacher/students', methods=['GET'])
 def get_students():
     uid = session.get('user_id')
@@ -263,6 +281,12 @@ def get_students():
 
 @app.route('/api/teacher/students', methods=['POST'])
 def add_student():
+    """
+    FIX 4 & 5: Teacher no longer enters email. We auto-generate a unique internal
+    login ID so two students with the same name never collide, and deleted+re-added
+    students get a fresh account (old login stops working immediately).
+    Returns the generated login_id and password so teacher can share with student.
+    """
     uid = session.get('user_id')
     data = request.json
     conn = get_db()
@@ -273,6 +297,7 @@ def add_student():
         conn.close()
         return jsonify({'error': 'Student name is required'}), 400
 
+    # FIX 3: Validate teacher-set password, or auto-generate a strong one
     raw_password = data.get('password', '').strip()
     if raw_password:
         ok, msg = validate_password(raw_password)
@@ -280,19 +305,22 @@ def add_student():
             conn.close()
             return jsonify({'error': msg}), 400
     else:
+        # Auto-generate: 10 chars with guaranteed uppercase + digit
         chars = string.ascii_letters + string.digits
         raw_password = (
             secrets.choice(string.ascii_uppercase) +
             secrets.choice(string.digits) +
             ''.join(secrets.choice(chars) for _ in range(8))
         )
+        # Shuffle so uppercase/digit aren't always first
         lst = list(raw_password)
         secrets.SystemRandom().shuffle(lst)
         raw_password = ''.join(lst)
 
+    # FIX 4 & 5: Generate unique internal login ID — teacher never sees/sets it
     login_id = generate_student_login_id(uid, name)
     while c.execute('SELECT id FROM users WHERE email=?', (login_id,)).fetchone():
-        login_id = generate_student_login_id(uid, name)
+        login_id = generate_student_login_id(uid, name)  # retry on extreme collision
 
     try:
         c.execute('INSERT INTO users (name, email, password, role) VALUES (?,?,?,?)',
@@ -302,20 +330,14 @@ def add_student():
         conn.close()
         return jsonify({'error': 'Could not create student, please try again'}), 400
 
-    # Safely parse fees incase empty string is provided
-    fees_val = data.get('fees', 0)
-    try:
-        fees_float = float(fees_val) if fees_val != '' else 0.0
-    except ValueError:
-        fees_float = 0.0
-
     c.execute('''INSERT INTO students (user_id, teacher_id, class, batch, school, fees, joined_date)
                  VALUES (?,?,?,?,?,?,?)''',
               (student_user_id, uid, data.get('class', ''), data.get('batch', ''),
-               data.get('school', ''), fees_float,
+               data.get('school', ''), float(data.get('fees', 0)),
                data.get('joined_date', '') or datetime.now().strftime('%Y-%m-%d')))
     conn.commit()
     conn.close()
+    # Return credentials so teacher can share with student (shown once in UI)
     return jsonify({'success': True, 'login_id': login_id, 'password': raw_password})
 
 @app.route('/api/teacher/students/<int:sid>', methods=['PUT'])
@@ -330,16 +352,10 @@ def update_student(sid):
         conn.close()
         return jsonify({'error': 'Not found'}), 404
     
-    fees_val = data.get('fees', 0)
-    try:
-        fees_float = float(fees_val) if fees_val != '' else 0.0
-    except ValueError:
-        fees_float = 0.0
-        
     c.execute('UPDATE users SET name=? WHERE id=?', (data['name'], stu['user_id']))
     c.execute('''UPDATE students SET class=?, batch=?, school=?, fees=?, joined_date=? WHERE id=?''',
               (data.get('class',''), data.get('batch',''), data.get('school',''),
-               fees_float,
+               float(data.get('fees',0)),
                data.get('joined_date', '') or datetime.now().strftime('%Y-%m-%d'),
                sid))
     conn.commit()
@@ -348,6 +364,16 @@ def update_student(sid):
 
 @app.route('/api/teacher/students/<int:sid>', methods=['DELETE'])
 def delete_student(sid):
+    """
+    FIX 1: Proper cascade delete.
+    Steps:
+      1. Find the student's user_id (verify ownership)
+      2. Delete fees, doubts, task_items, tasks for this teacher-student pair
+      3. Delete the students row
+      4. Delete the users row — this kills login immediately.
+         (Safe because auto-generated login IDs are unique per add, so
+          re-adding the student creates a brand new account.)
+    """
     uid = session.get('user_id')
     conn = get_db()
     c = conn.cursor()
@@ -359,6 +385,7 @@ def delete_student(sid):
 
     student_uid = row['user_id']
 
+    # Delete child records for this teacher-student relationship
     c.execute('DELETE FROM fees   WHERE student_id=? AND teacher_id=?', (student_uid, uid))
     c.execute('DELETE FROM doubts WHERE student_id=? AND teacher_id=?', (student_uid, uid))
 
@@ -369,13 +396,18 @@ def delete_student(sid):
         c.execute('DELETE FROM task_items WHERE task_id=?', (tid,))
     c.execute('DELETE FROM tasks WHERE student_id=? AND teacher_id=?', (student_uid, uid))
 
+    # Delete the student profile row
     c.execute('DELETE FROM students WHERE id=? AND teacher_id=?', (sid, uid))
+
+    # Delete the user account entirely — login_id was auto-generated and unique,
+    # so this is safe. Deleted student can no longer log in at all.
     c.execute('DELETE FROM users WHERE id=?', (student_uid,))
 
     conn.commit()
     conn.close()
     return jsonify({'success': True})
 
+# Doubts
 @app.route('/api/teacher/doubts')
 def teacher_doubts():
     uid = session.get('user_id')
@@ -402,6 +434,7 @@ def answer_doubt(did):
     conn.close()
     return jsonify({'success': True})
 
+# Tasks
 @app.route('/api/teacher/tasks', methods=['GET'])
 def teacher_tasks():
     uid = session.get('user_id')
@@ -446,6 +479,7 @@ def create_task():
     conn.close()
     return jsonify({'success': True})
 
+# Fees
 @app.route('/api/teacher/fees')
 def teacher_fees():
     uid = session.get('user_id')
@@ -496,15 +530,10 @@ def add_fee():
         conn.close()
         return jsonify({'error': 'Student not found'}), 404
     
-    existing = c.execute('SELECT id, status FROM fees WHERE student_id=? AND teacher_id=? AND month=? AND year=?',
+    existing = c.execute('SELECT id FROM fees WHERE student_id=? AND teacher_id=? AND month=? AND year=?',
                          (data['student_id'], uid, data['month'], data['year'])).fetchone()
-    
     if existing:
-        # If it is paid, make it unpaid again instead of clearing it entirely
-        if existing['status'] == 'paid':
-            c.execute('UPDATE fees SET status="unpaid" WHERE id=?', (existing['id'],))
-        else:
-            c.execute('DELETE FROM fees WHERE id=?', (existing['id'],))
+        c.execute('DELETE FROM fees WHERE id=?', (existing['id'],))
     else:
         c.execute('INSERT INTO fees (student_id, teacher_id, month, year, status, amount) VALUES (?,?,?,?,?,?)',
                   (data['student_id'], uid, data['month'], data['year'], 'unpaid', stu['fees']))
