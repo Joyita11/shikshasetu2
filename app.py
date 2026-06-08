@@ -73,6 +73,8 @@ def init_db():
         c.execute('ALTER TABLE users ADD COLUMN upi_id TEXT DEFAULT ""')
     except Exception:
         pass  # Column already exists — that's fine
+
+    c.execute('''CREATE TABLE IF NOT EXISTS students (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER REFERENCES users(id),
         teacher_id INTEGER REFERENCES users(id),
