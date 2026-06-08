@@ -169,7 +169,14 @@
         </div>
       </div>
       <div class="form-group"><label>School</label><input id="s-school" type="text" placeholder="School name" /></div>
-      <div class="form-group"><label>Monthly Fees (₹)</label><input id="s-fees" type="number" placeholder="0" /></div>
+      <div class="form-row">
+        <div class="form-group"><label>Monthly Fees (₹)</label><input id="s-fees" type="number" placeholder="0" /></div>
+        <div class="form-group">
+          <label>Joining Date</label>
+          <input id="s-joined-date" type="date" />
+          <p style="font-size:13px;color:var(--ink-3);margin-top:5px">Fees are tracked from this date.</p>
+        </div>
+      </div>
 
       <div id="modal-err" class="error-msg" style="display:none"></div>
       <button class="btn-dark full-width" style="padding:16px;font-size:17px" onclick="saveStudent()">Save

@@ -328,7 +328,7 @@ def add_student():
                  VALUES (?,?,?,?,?,?,?)''',
               (student_user_id, uid, data.get('class', ''), data.get('batch', ''),
                data.get('school', ''), float(data.get('fees', 0)),
-               datetime.now().strftime('%Y-%m-%d')))
+               data.get('joined_date', '') or datetime.now().strftime('%Y-%m-%d')))
     conn.commit()
     conn.close()
     # Return credentials so teacher can share with student (shown once in UI)
@@ -347,9 +347,11 @@ def update_student(sid):
         return jsonify({'error': 'Not found'}), 404
     
     c.execute('UPDATE users SET name=? WHERE id=?', (data['name'], stu['user_id']))
-    c.execute('''UPDATE students SET class=?, batch=?, school=?, fees=? WHERE id=?''',
-              (data.get('class',''), data.get('batch',''), data.get('school',''), 
-               float(data.get('fees',0)), sid))
+    c.execute('''UPDATE students SET class=?, batch=?, school=?, fees=?, joined_date=? WHERE id=?''',
+              (data.get('class',''), data.get('batch',''), data.get('school',''),
+               float(data.get('fees',0)),
+               data.get('joined_date', '') or datetime.now().strftime('%Y-%m-%d'),
+               sid))
     conn.commit()
     conn.close()
     return jsonify({'success': True})
