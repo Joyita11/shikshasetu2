@@ -49,6 +49,16 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  // Task modal — ChatGPT, Google, Send buttons (wired here to avoid inline onclick)
+  var chatgptBtn = document.getElementById('task-chatgpt-btn');
+  if (chatgptBtn) chatgptBtn.addEventListener('click', function () { openTaskSearch('chatgpt'); });
+
+  var googleBtn = document.getElementById('task-google-btn');
+  if (googleBtn) googleBtn.addEventListener('click', function () { openTaskSearch('google'); });
+
+  var sendTasksBtn = document.getElementById('send-tasks-btn');
+  if (sendTasksBtn) sendTasksBtn.addEventListener('click', sendTasks);
+
 });
 
 async function doLogout() {
@@ -239,7 +249,7 @@ async function deleteStudent(id) {
 
 // ─── TASKS ───
 let currentTaskStudentId = null;
-let uploadedFileData = '';
+let uploadedFiles = [];   // array of { name, data } — supports multiple files
 
 async function loadTasks() {
   const studentsRes = await fetch('/api/teacher/students');
@@ -267,12 +277,15 @@ async function loadTasks() {
 
 function openTaskModal(userId, name, batch) {
   currentTaskStudentId = userId;
-  uploadedFileData = '';
+  uploadedFiles = [];   // clear files array on each open
   document.getElementById('task-student-name').textContent = name;
   document.getElementById('task-student-batch').textContent = batch;
   document.getElementById('task-title').value = '';
+  document.getElementById('task-search-query').value = '';
   document.getElementById('task-items-list').innerHTML = '<div class="task-item-row"><input type="text" placeholder="Task 1" class="task-input"/></div>';
-  document.getElementById('file-name').textContent = '';
+  document.getElementById('uploaded-files-list').innerHTML = '';
+  document.getElementById('file-upload').value = '';
+  document.getElementById('task-modal-err').style.display = 'none';
   document.getElementById('task-modal-err').textContent = '';
   document.getElementById('modal-assign-task').style.display = 'flex';
 }
@@ -286,31 +299,94 @@ function addTaskItem() {
   list.appendChild(row);
 }
 
+// Handle multiple file selection — reads each file as base64 and adds to uploadedFiles[]
 function handleFileUpload(input) {
-  const file = input.files[0];
-  if (!file) return;
-  document.getElementById('file-name').textContent = '📎 ' + file.name;
-  const reader = new FileReader();
-  reader.onload = e => { uploadedFileData = e.target.result; };
-  reader.readAsDataURL(file);
+  const files = Array.from(input.files);
+  if (!files.length) return;
+
+  files.forEach(file => {
+    // Prevent duplicate names
+    if (uploadedFiles.find(f => f.name === file.name)) return;
+
+    const reader = new FileReader();
+    reader.onload = e => {
+      uploadedFiles.push({ name: file.name, data: e.target.result });
+      renderUploadedFiles();
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Reset the input so the same file can be re-added after removal
+  input.value = '';
+}
+
+// Render the list of uploaded files with individual remove buttons
+function renderUploadedFiles() {
+  const list = document.getElementById('uploaded-files-list');
+  if (!uploadedFiles.length) {
+    list.innerHTML = '';
+    return;
+  }
+  list.innerHTML = uploadedFiles.map((f, idx) => {
+    // Truncate long names for display
+    const displayName = f.name.length > 30 ? f.name.slice(0, 28) + '…' : f.name;
+    const isImg = /\.(png|jpg|jpeg|gif|webp)$/i.test(f.name);
+    return `
+    <div style="display:flex;align-items:center;gap:8px;background:var(--cream);border:1.5px solid var(--sand);border-radius:8px;padding:8px 12px">
+      <span style="font-size:18px">${isImg ? '🖼' : '📄'}</span>
+      <span style="flex:1;font-size:14px;color:var(--ink-2);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(displayName)}</span>
+      <button onclick="removeFile(${idx})"
+        style="background:var(--red-light);border:none;border-radius:6px;color:var(--red);cursor:pointer;font-size:13px;padding:4px 8px;font-weight:700;font-family:inherit;flex-shrink:0;touch-action:manipulation">✕</button>
+    </div>`;
+  }).join('');
+}
+
+// Remove a file from the list by index
+function removeFile(idx) {
+  uploadedFiles.splice(idx, 1);
+  renderUploadedFiles();
+}
+
+// ChatGPT and Google search — uses the title input or a dedicated search field
+function openTaskSearch(engine) {
+  const query = document.getElementById('task-search-query').value.trim()
+    || document.getElementById('task-title').value.trim()
+    || 'study material';
+  if (engine === 'chatgpt') {
+    window.open('https://chatgpt.com/?q=' + encodeURIComponent(query), '_blank');
+  } else {
+    window.open('https://www.google.com/search?q=' + encodeURIComponent(query), '_blank');
+  }
 }
 
 async function sendTasks() {
   const err = document.getElementById('task-modal-err');
+  err.style.display = 'none';
   err.textContent = '';
   const title = document.getElementById('task-title').value.trim();
   const inputs = document.querySelectorAll('#task-items-list .task-input');
   const items = Array.from(inputs).map(i => i.value.trim()).filter(Boolean);
-  if (!items.length) { err.textContent = 'Add at least one task.'; return; }
+  if (!items.length) {
+    err.textContent = 'Add at least one task.';
+    err.style.display = 'block';
+    return;
+  }
 
+  // Send uploadedFiles as JSON array (or empty array if none)
+  // study_material is now stored as JSON string: '[{"name":"file.pdf","data":"data:..."}]'
   const res = await fetch('/api/teacher/tasks', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ student_id: currentTaskStudentId, title, study_material: uploadedFileData, items })
+    body: JSON.stringify({
+      student_id: currentTaskStudentId,
+      title,
+      study_material: uploadedFiles.length ? JSON.stringify(uploadedFiles) : '',
+      items
+    })
   });
   const d = await res.json();
   if (d.success) { closeModal('modal-assign-task'); }
-  else err.textContent = d.error || 'Failed.';
+  else { err.textContent = d.error || 'Failed.'; err.style.display = 'block'; }
 }
 
 // ─── FEES ───

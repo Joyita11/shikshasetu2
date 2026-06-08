@@ -209,30 +209,70 @@
         </div>
         <button onclick="closeModal('modal-assign-task')" class="modal-close">✕</button>
       </div>
+
+      <!-- ── Research helpers ── -->
+      <div style="margin-bottom:20px">
+        <div
+          style="font-weight:700;font-size:15px;color:var(--ink-3);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">
+          🔍 Research for this task</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button id="task-chatgpt-btn"
+            style="display:flex;align-items:center;gap:8px;padding:10px 18px;border:2px solid var(--sand);border-radius:10px;background:var(--white);cursor:pointer;font-size:15px;font-weight:600;color:var(--ink-2);font-family:inherit;transition:all .2s"
+            onmouseover="this.style.borderColor='#10a37f';this.style.color='#10a37f'"
+            onmouseout="this.style.borderColor='var(--sand)';this.style.color='var(--ink-2)'">
+            🤖 Ask ChatGPT
+          </button>
+          <button id="task-google-btn"
+            style="display:flex;align-items:center;gap:8px;padding:10px 18px;border:2px solid var(--sand);border-radius:10px;background:var(--white);cursor:pointer;font-size:15px;font-weight:600;color:var(--ink-2);font-family:inherit;transition:all .2s"
+            onmouseover="this.style.borderColor='#4285f4';this.style.color='#4285f4'"
+            onmouseout="this.style.borderColor='var(--sand)';this.style.color='var(--ink-2)'">
+            🔍 Search Google
+          </button>
+        </div>
+        <input id="task-search-query" type="text" placeholder="Type a topic to search (optional)…"
+          style="margin-top:10px;width:100%;padding:10px 14px;border:2px solid var(--sand);border-radius:10px;font-size:15px;font-family:inherit;box-sizing:border-box;background:var(--cream);color:var(--ink);outline:none" />
+      </div>
+
       <div style="display:flex;gap:20px;flex-wrap:wrap">
+        <!-- ── Left: files + title ── -->
         <div style="flex:1;min-width:200px">
-          <div class="upload-box" onclick="document.getElementById('file-upload').click()">
-            <div style="font-size:32px;margin-bottom:8px">📄</div>
-            <div style="font-size:16px">Click to upload PDF or Image</div>
-            <input type="file" id="file-upload" accept=".pdf,image/*" style="display:none"
+          <div
+            style="font-weight:700;margin-bottom:10px;font-size:15px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.5px">
+            📎 Study Materials</div>
+
+          <!-- Drop zone — multiple files -->
+          <div class="upload-box" id="upload-drop-zone" onclick="document.getElementById('file-upload').click()"
+            style="position:relative">
+            <div style="font-size:28px;margin-bottom:6px">📄</div>
+            <div style="font-size:15px;font-weight:600">Click to upload files</div>
+            <div style="font-size:13px;color:var(--ink-3);margin-top:4px">PDFs or images — multiple allowed</div>
+            <input type="file" id="file-upload" accept=".pdf,image/*" multiple style="display:none"
               onchange="handleFileUpload(this)" />
           </div>
-          <div id="file-name" style="font-size:14px;color:var(--ink-3);margin-top:8px"></div>
-          <input id="task-title" type="text" placeholder="Title (e.g. Physics Notes)"
-            style="margin-top:12px;width:100%;padding:12px 16px;border:2px solid var(--sand);border-radius:10px;font-size:16px;font-family:inherit;box-sizing:border-box;background:var(--cream)" />
+
+          <!-- List of uploaded files with remove buttons -->
+          <div id="uploaded-files-list" style="margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
+
+          <input id="task-title" type="text" placeholder="Assignment title (e.g. Physics Ch.3)"
+            style="margin-top:14px;width:100%;padding:12px 16px;border:2px solid var(--sand);border-radius:10px;font-size:16px;font-family:inherit;box-sizing:border-box;background:var(--cream)" />
         </div>
+
+        <!-- ── Right: homework to-dos ── -->
         <div style="flex:1;min-width:200px">
-          <div style="font-weight:700;margin-bottom:12px;font-size:17px;color:var(--ink)">📋 Homework To-Dos</div>
+          <div
+            style="font-weight:700;margin-bottom:12px;font-size:15px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.5px">
+            📋 Homework To-Dos</div>
           <div id="task-items-list">
             <div class="task-item-row"><input type="text" placeholder="Task 1" class="task-input" /></div>
           </div>
           <button onclick="addTaskItem()"
-            style="color:var(--teal);background:none;border:none;cursor:pointer;font-size:16px;padding:6px 0;font-family:inherit;font-weight:600">+
+            style="color:var(--teal);background:none;border:none;cursor:pointer;font-size:16px;padding:6px 0;font-family:inherit;font-weight:600;touch-action:manipulation">+
             Add Another Task</button>
         </div>
       </div>
+
       <div id="task-modal-err" class="error-msg" style="margin-top:12px;display:none"></div>
-      <button class="btn-blue full-width" style="margin-top:18px;padding:16px;font-size:17px" onclick="sendTasks()">✈
+      <button class="btn-blue full-width" id="send-tasks-btn" style="margin-top:18px;padding:16px;font-size:17px">✈
         Send All Tasks</button>
     </div>
   </div>

@@ -153,9 +153,28 @@ async function loadAssignments() {
       ? '<span class="assignment-status-completed">COMPLETED</span>'
       : '<span class="assignment-status-pending">PENDING</span>';
     const date = new Date(a.created_at).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
-    const studyMaterial = a.study_material
-      ? `<a href="${a.study_material}" download="study_material" style="color:#2563eb;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">📥 Study Material</a>`
-      : '';
+    // study_material is now a JSON array: [{name, data}, ...]
+    // Fall back gracefully for old single-file format (bare base64 string)
+    let studyMaterialHtml = '';
+    if (a.study_material) {
+      try {
+        const files = JSON.parse(a.study_material);  // new format: array
+        if (Array.isArray(files) && files.length) {
+          studyMaterialHtml = `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">` +
+            files.map(f => {
+              const isImg = /\.(png|jpg|jpeg|gif|webp)$/i.test(f.name);
+              return `<a href="${f.data}" download="${escHtml(f.name)}"
+                style="display:inline-flex;align-items:center;gap:6px;background:var(--teal-light);color:var(--teal);border:1.5px solid var(--teal);border-radius:8px;padding:6px 12px;font-size:13px;font-weight:700;text-decoration:none">
+                ${isImg ? '🖼' : '📄'} ${escHtml(f.name)}
+              </a>`;
+            }).join('') + `</div>`;
+        }
+      } catch (e) {
+        // Old single-file format — render as before
+        studyMaterialHtml = `<a href="${a.study_material}" download="study_material"
+          style="color:#2563eb;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">📥 Study Material</a>`;
+      }
+    }
     const items = a.items.map(item => {
       const isDone = item.completed;
       return `
@@ -168,9 +187,9 @@ async function loadAssignments() {
     }).join('');
     return `
     <div class="assignment-card">
-      <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         ${statusBadge}
-        ${studyMaterial}
+        ${studyMaterialHtml}
       </div>
       <div style="color:#666;font-size:14px;margin:6px 0 14px">Assigned on ${date}</div>
       <div style="font-weight:700;margin-bottom:10px">Tasks</div>
