@@ -9,10 +9,6 @@ function closeSidebar() {
 }
 
 // ─── NAVIGATION ───
-// NOTE: We use only 'click' events (NOT touchend) because:
-//   1. touch-action:manipulation in CSS already removes the 300ms delay
-//   2. touchend fires before the browser processes z-index, causing overlay to steal the tap
-//   3. click is reliable across all devices once the delay is gone
 function showPage(name, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -29,10 +25,7 @@ function loadPage(name) {
   if (name === 'fees') loadFees();
 }
 
-// Wire up nav items and logout after DOM is ready
 document.addEventListener('DOMContentLoaded', function () {
-
-  // Nav items — simple click only (touch-action:manipulation in CSS removes 300ms delay)
   document.querySelectorAll('.sidebar-nav .nav-item').forEach(function (link) {
     link.addEventListener('click', function (e) {
       e.preventDefault();
@@ -40,7 +33,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
-  // Logout button
   var logoutBtn = document.getElementById('logout-btn');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', function (e) {
@@ -48,7 +40,6 @@ document.addEventListener('DOMContentLoaded', function () {
       doLogout();
     });
   }
-
 });
 
 async function doLogout() {
@@ -65,12 +56,12 @@ const QUOTES = [
 
 // ─── DASHBOARD ───
 async function loadDashboard() {
-  const meRes = await fetch('/api/me');
+  const meRes = await fetch('/api/me', { cache: 'no-store' });
   const me = await meRes.json();
   const firstName = me.name ? me.name.split(' ')[0] : 'Dreamer';
   document.getElementById('stu-greeting').textContent = `Hello, ${firstName}! 👋`;
 
-  const res = await fetch('/api/student/stats');
+  const res = await fetch('/api/student/stats', { cache: 'no-store' });
   const d = await res.json();
 
   document.getElementById('stu-pending-tasks').innerHTML = `${d.pending_tasks} <span style="font-size:16px;color:#666">Items</span>`;
@@ -86,7 +77,7 @@ async function loadDashboard() {
 
 // ─── DOUBTS ───
 async function loadDoubts() {
-  const res = await fetch('/api/student/doubts');
+  const res = await fetch('/api/student/doubts', { cache: 'no-store' });
   const doubts = await res.json();
   const list = document.getElementById('recent-doubts-list');
   if (!doubts.length) {
@@ -141,7 +132,7 @@ async function submitDoubt() {
 
 // ─── ASSIGNMENTS ───
 async function loadAssignments() {
-  const res = await fetch('/api/student/assignments');
+  const res = await fetch('/api/student/assignments', { cache: 'no-store' });
   const assignments = await res.json();
   const container = document.getElementById('assignments-list');
   if (!assignments.length) {
@@ -153,12 +144,10 @@ async function loadAssignments() {
       ? '<span class="assignment-status-completed">COMPLETED</span>'
       : '<span class="assignment-status-pending">PENDING</span>';
     const date = new Date(a.created_at).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
-    // study_material is now a JSON array: [{name, data}, ...]
-    // Fall back gracefully for old single-file format (bare base64 string)
     let studyMaterialHtml = '';
     if (a.study_material) {
       try {
-        const files = JSON.parse(a.study_material);  // new format: array
+        const files = JSON.parse(a.study_material);
         if (Array.isArray(files) && files.length) {
           studyMaterialHtml = `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">` +
             files.map(f => {
@@ -170,7 +159,6 @@ async function loadAssignments() {
             }).join('') + `</div>`;
         }
       } catch (e) {
-        // Old single-file format — render as before
         studyMaterialHtml = `<a href="${a.study_material}" download="study_material"
           style="color:#2563eb;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">📥 Study Material</a>`;
       }
@@ -206,10 +194,10 @@ async function completeTask(itemId) {
 
 // ─── FEES ───
 async function loadFees() {
-  const res = await fetch('/api/student/fees');
+  const res = await fetch('/api/student/fees', { cache: 'no-store' });
   const data = await res.json();
 
-  const fees = data.fees || [];
+  const fees = data.fees || data; // Handle array vs object variation gracefully
   const tbody = document.getElementById('fees-tbody-student');
   if (!fees.length) {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:#666">No fee records found.</td></tr>';
