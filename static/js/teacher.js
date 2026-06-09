@@ -49,6 +49,16 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  // Delete student — event delegation on tbody so it works after dynamic re-render
+  var studentsTbody = document.getElementById('students-tbody');
+  if (studentsTbody) {
+    studentsTbody.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-delete-id]');
+      if (!btn) return;
+      deleteStudent(Number(btn.getAttribute('data-delete-id')));
+    });
+  }
+
   // Task modal — ChatGPT, Google, Send buttons (wired here to avoid inline onclick)
   var chatgptBtn = document.getElementById('task-chatgpt-btn');
   if (chatgptBtn) chatgptBtn.addEventListener('click', function () { openTaskSearch('chatgpt'); });
@@ -166,7 +176,7 @@ async function loadStudents() {
       <td>${s.joined_date || ''}</td>
       <td>
         <button class="action-btn" onclick="openEditStudent(${s.id}, ${JSON.stringify(s).replace(/"/g, '&quot;')})">✏️</button>
-        <button class="action-btn del" onclick="deleteStudent(${s.id})">🗑️</button>
+        <button class="action-btn del" data-delete-id="${s.id}">🗑️</button>
       </td>
     </tr>`;
   }).join('');
@@ -243,9 +253,19 @@ async function saveStudent() {
 }
 
 async function deleteStudent(id) {
-  if (!confirm('Delete this student?')) return;
-  await fetch(`/api/teacher/students/${id}`, { method: 'DELETE' });
-  loadStudents(); loadDashboard();
+  if (!confirm('Delete this student? This cannot be undone.')) return;
+  try {
+    const res = await fetch(`/api/teacher/students/${id}`, { method: 'DELETE' });
+    const d = await res.json();
+    if (d.success) {
+      await loadStudents();
+      await loadDashboard();
+    } else {
+      alert('Delete failed: ' + (d.error || 'Unknown error'));
+    }
+  } catch (e) {
+    alert('Delete failed: network error. Please try again.');
+  }
 }
 
 // ─── TASKS ───

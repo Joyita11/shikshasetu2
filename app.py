@@ -52,7 +52,7 @@ def generate_student_login_id(teacher_id, student_name):
     Stored as-is (no fake email). Easy to read and type on mobile.
     The @setu.local suffix is gone — students just type e.g. advik3890"""
     name_slug = ''.join(c for c in student_name.lower() if c.isalpha())[:8]
-    rand = ''.join(secrets.choice(string.digits) for _ in range(4))
+    rand = ''.join(secrets.choice(string.digits) for _ in range(6))
     return f"{name_slug}{rand}"
 
 def init_db():
@@ -530,10 +530,15 @@ def add_fee():
         conn.close()
         return jsonify({'error': 'Student not found'}), 404
     
-    existing = c.execute('SELECT id FROM fees WHERE student_id=? AND teacher_id=? AND month=? AND year=?',
+    existing = c.execute('SELECT id, status FROM fees WHERE student_id=? AND teacher_id=? AND month=? AND year=?',
                          (data['student_id'], uid, data['month'], data['year'])).fetchone()
     if existing:
-        c.execute('DELETE FROM fees WHERE id=?', (existing['id'],))
+        if existing['status'] == 'paid':
+            # Month pill was green (paid) → click flips it back to unpaid
+            c.execute("UPDATE fees SET status='unpaid' WHERE id=?", (existing['id'],))
+        else:
+            # Month pill was orange (unpaid) → click removes it (deselects the month)
+            c.execute('DELETE FROM fees WHERE id=?', (existing['id'],))
     else:
         c.execute('INSERT INTO fees (student_id, teacher_id, month, year, status, amount) VALUES (?,?,?,?,?,?)',
                   (data['student_id'], uid, data['month'], data['year'], 'unpaid', stu['fees']))
