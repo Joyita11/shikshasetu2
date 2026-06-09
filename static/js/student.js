@@ -209,7 +209,7 @@ async function loadFees() {
   const res = await fetch('/api/student/fees');
   const data = await res.json();
 
-  const fees = data.fees || [];
+  const fees = Array.isArray(data) ? data : (data.fees || []);
   const tbody = document.getElementById('fees-tbody-student');
   if (!fees.length) {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:#666">No fee records found.</td></tr>';
