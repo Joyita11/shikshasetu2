@@ -78,7 +78,7 @@ async function loadDashboard() {
 
 // ─── DOUBTS ───
 let currentDoubtId = null;
-const _doubtsMap = {};  // id → question, avoids inline string escaping issues
+const _doubtsMap = {};
 
 async function loadDoubts() {
   const res = await fetch('/api/teacher/doubts');
