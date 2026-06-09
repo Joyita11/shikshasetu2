@@ -98,29 +98,9 @@ async function loadDoubts() {
       ? '<span class="doubt-status-solved">Solved</span>'
       : '<span class="doubt-status-pending">pending</span>';
     const date = new Date(d.created_at).toLocaleString();
-    let answerBlock = '';
-    if (d.answer || d.answer_files) {
-      let filesHtml = '';
-      if (d.answer_files) {
-        try {
-          const files = JSON.parse(d.answer_files);
-          if (Array.isArray(files) && files.length) {
-            filesHtml = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">` +
-              files.map(f => {
-                const isImg = /\.(png|jpg|jpeg|gif|webp)$/i.test(f.name);
-                return `<a href="${f.data}" download="${escHtml(f.name)}"
-                  style="display:inline-flex;align-items:center;gap:5px;background:#dcfce7;color:#16a34a;border:1.5px solid #86efac;border-radius:7px;padding:5px 10px;font-size:12px;font-weight:700;text-decoration:none">
-                  ${isImg ? '🖼' : '📄'} ${escHtml(f.name)}
-                </a>`;
-              }).join('') + `</div>`;
-          }
-        } catch(e) {}
-      }
-      answerBlock = `<div style="background:#f0fdf4;border-radius:8px;padding:10px;margin-top:10px;font-size:13px;color:#374151;border-left:3px solid #22c55e">
-        <strong>Teacher:</strong> ${d.answer ? escHtml(d.answer) : '<em style="color:#6b7280">See attached file(s) below</em>'}
-        ${filesHtml}
-      </div>`;
-    }
+    const answerBlock = d.answer
+      ? `<div style="background:#f0fdf4;border-radius:8px;padding:10px;margin-top:10px;font-size:13px;color:#374151;border-left:3px solid #22c55e"><strong>Teacher:</strong> ${escHtml(d.answer)}</div>`
+      : '';
     return `
     <div class="doubt-card-student">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -229,7 +209,7 @@ async function loadFees() {
   const res = await fetch('/api/student/fees');
   const data = await res.json();
 
-  const fees = Array.isArray(data) ? data : (data.fees || []);
+  const fees = data.fees || [];
   const tbody = document.getElementById('fees-tbody-student');
   if (!fees.length) {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:#666">No fee records found.</td></tr>';
