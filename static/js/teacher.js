@@ -184,13 +184,22 @@ async function submitAnswer() {
     alert('Please type an answer or attach at least one file.');
     return;
   }
-  await fetch(`/api/teacher/doubts/${currentDoubtId}/answer`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ answer, answer_files: JSON.stringify(answerFiles) })
-  });
-  closeModal('modal-answer');
-  loadDoubts();
+  try {
+    const res = await fetch(`/api/teacher/doubts/${currentDoubtId}/answer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answer, answer_files: JSON.stringify(answerFiles) })
+    });
+    const d = await res.json();
+    if (d.success) {
+      closeModal('modal-answer');
+      loadDoubts();
+    } else {
+      alert('Failed to submit answer: ' + (d.error || 'Unknown error'));
+    }
+  } catch (e) {
+    alert('Network error. Please try again.');
+  }
 }
 
 // ─── STUDENTS ───
