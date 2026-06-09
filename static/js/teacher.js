@@ -109,7 +109,7 @@ async function loadDoubts() {
                 </a>`;
               }).join('') + `</div>`;
           }
-        } catch (e) { }
+        } catch(e) {}
       }
       answerBlock = `<div class="doubt-answer"><strong>Your Answer:</strong> ${d.answer ? escHtml(d.answer) : '<em style="color:var(--ink-3)">See attached file(s)</em>'}${filesHtml}</div>`;
     }
