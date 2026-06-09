@@ -114,7 +114,7 @@ async function loadDoubts() {
                 </a>`;
               }).join('') + `</div>`;
           }
-        } catch(e) {}
+        } catch (e) { }
       }
       answerBlock = `<div style="background:#f0fdf4;border-radius:8px;padding:10px;margin-top:10px;font-size:13px;color:#374151;border-left:3px solid #22c55e">
         <strong>Teacher:</strong> ${d.answer ? escHtml(d.answer) : '<em style="color:#6b7280">See attached file(s) below</em>'}
