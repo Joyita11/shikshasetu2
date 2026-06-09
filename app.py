@@ -52,7 +52,7 @@ def generate_student_login_id(teacher_id, student_name):
     Stored as-is (no fake email). Easy to read and type on mobile.
     The @setu.local suffix is gone — students just type e.g. advik3890"""
     name_slug = ''.join(c for c in student_name.lower() if c.isalpha())[:8]
-    rand = ''.join(secrets.choice(string.digits) for _ in range(6))
+    rand = ''.join(secrets.choice(string.digits) for _ in range(4))
     return f"{name_slug}{rand}"
 
 def init_db():
@@ -71,6 +71,12 @@ def init_db():
     # Add upi_id column if it doesn't exist yet (safe migration for existing DBs)
     try:
         c.execute('ALTER TABLE users ADD COLUMN upi_id TEXT DEFAULT ""')
+    except Exception:
+        pass  # Column already exists — that's fine
+
+    # Add answer_files column to doubts for PDF/image attachments in answers
+    try:
+        c.execute('ALTER TABLE doubts ADD COLUMN answer_files TEXT DEFAULT ""')
     except Exception:
         pass  # Column already exists — that's fine
 
@@ -428,8 +434,9 @@ def answer_doubt(did):
     data = request.json
     conn = get_db()
     c = conn.cursor()
-    c.execute('UPDATE doubts SET answer=?, status="solved" WHERE id=? AND teacher_id=?',
-              (data['answer'], did, uid))
+    answer_files = data.get('answer_files', '')  # JSON string: [{name, data}, ...]
+    c.execute('UPDATE doubts SET answer=?, answer_files=?, status="solved" WHERE id=? AND teacher_id=?',
+              (data['answer'], answer_files, did, uid))
     conn.commit()
     conn.close()
     return jsonify({'success': True})
@@ -530,15 +537,10 @@ def add_fee():
         conn.close()
         return jsonify({'error': 'Student not found'}), 404
     
-    existing = c.execute('SELECT id, status FROM fees WHERE student_id=? AND teacher_id=? AND month=? AND year=?',
+    existing = c.execute('SELECT id FROM fees WHERE student_id=? AND teacher_id=? AND month=? AND year=?',
                          (data['student_id'], uid, data['month'], data['year'])).fetchone()
     if existing:
-        if existing['status'] == 'paid':
-            # Month pill was green (paid) → click flips it back to unpaid
-            c.execute("UPDATE fees SET status='unpaid' WHERE id=?", (existing['id'],))
-        else:
-            # Month pill was orange (unpaid) → click removes it (deselects the month)
-            c.execute('DELETE FROM fees WHERE id=?', (existing['id'],))
+        c.execute('DELETE FROM fees WHERE id=?', (existing['id'],))
     else:
         c.execute('INSERT INTO fees (student_id, teacher_id, month, year, status, amount) VALUES (?,?,?,?,?,?)',
                   (data['student_id'], uid, data['month'], data['year'], 'unpaid', stu['fees']))

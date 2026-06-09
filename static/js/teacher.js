@@ -49,16 +49,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // Delete student — event delegation on tbody so it works after dynamic re-render
-  var studentsTbody = document.getElementById('students-tbody');
-  if (studentsTbody) {
-    studentsTbody.addEventListener('click', function (e) {
-      var btn = e.target.closest('[data-delete-id]');
-      if (!btn) return;
-      deleteStudent(Number(btn.getAttribute('data-delete-id')));
-    });
-  }
-
   // Task modal — ChatGPT, Google, Send buttons (wired here to avoid inline onclick)
   var chatgptBtn = document.getElementById('task-chatgpt-btn');
   if (chatgptBtn) chatgptBtn.addEventListener('click', function () { openTaskSearch('chatgpt'); });
@@ -103,9 +93,26 @@ async function loadDoubts() {
     const badge = d.status === 'solved'
       ? '<span class="badge-solved">Solved</span>'
       : `<button class="btn-dark" style="font-size:13px;padding:8px 16px" onclick="openAnswerModal(${d.id}, '${escHtml(d.question)}')">Answer</button>`;
-    const answerBlock = d.answer
-      ? `<div class="doubt-answer"><strong>Your Answer:</strong> ${escHtml(d.answer)}</div>`
-      : '';
+    let answerBlock = '';
+    if (d.answer || d.answer_files) {
+      let filesHtml = '';
+      if (d.answer_files) {
+        try {
+          const files = JSON.parse(d.answer_files);
+          if (Array.isArray(files) && files.length) {
+            filesHtml = `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">` +
+              files.map(f => {
+                const isImg = /\.(png|jpg|jpeg|gif|webp)$/i.test(f.name);
+                return `<a href="${f.data}" download="${escHtml(f.name)}"
+                  style="display:inline-flex;align-items:center;gap:6px;background:var(--teal-light);color:var(--teal);border:1.5px solid var(--teal);border-radius:8px;padding:6px 12px;font-size:13px;font-weight:700;text-decoration:none">
+                  ${isImg ? '🖼' : '📄'} ${escHtml(f.name)}
+                </a>`;
+              }).join('') + `</div>`;
+          }
+        } catch (e) { }
+      }
+      answerBlock = `<div class="doubt-answer"><strong>Your Answer:</strong> ${d.answer ? escHtml(d.answer) : '<em style="color:var(--ink-3)">See attached file(s)</em>'}${filesHtml}</div>`;
+    }
     return `
       <div class="doubt-card">
         <div class="doubt-meta">
@@ -124,11 +131,38 @@ async function loadDoubts() {
   }).join('');
 }
 
+let answerFiles = [];  // [{name, data}, ...] for the current answer modal
+
 function openAnswerModal(id, question) {
   currentDoubtId = id;
+  answerFiles = [];
   document.getElementById('doubt-question-display').textContent = `"${question}"`;
   document.getElementById('doubt-answer').value = '';
+  document.getElementById('answer-files-list').innerHTML = '';
   document.getElementById('modal-answer').style.display = 'flex';
+}
+
+function handleAnswerFiles(input) {
+  const files = Array.from(input.files);
+  const list = document.getElementById('answer-files-list');
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      answerFiles.push({ name: file.name, data: e.target.result });
+      const isImg = /\.(png|jpg|jpeg|gif|webp)$/i.test(file.name);
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:var(--cream);border:1.5px solid var(--sand);border-radius:8px;padding:8px 12px;font-size:13px;font-weight:600';
+      row.innerHTML = `<span>${isImg ? '🖼' : '📄'} ${escHtml(file.name)}</span><button onclick="removeAnswerFile('${escHtml(file.name)}', this.parentElement)" style="background:none;border:none;cursor:pointer;color:#e74c3c;font-size:16px;padding:0 4px">✕</button>`;
+      list.appendChild(row);
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value = '';
+}
+
+function removeAnswerFile(name, row) {
+  answerFiles = answerFiles.filter(f => f.name !== name);
+  row.remove();
 }
 
 function searchOnChatGPT() {
@@ -143,11 +177,14 @@ function searchOnGoogle() {
 
 async function submitAnswer() {
   const answer = document.getElementById('doubt-answer').value.trim();
-  if (!answer) return;
+  if (!answer && !answerFiles.length) {
+    alert('Please type an answer or attach at least one file.');
+    return;
+  }
   await fetch(`/api/teacher/doubts/${currentDoubtId}/answer`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ answer })
+    body: JSON.stringify({ answer, answer_files: JSON.stringify(answerFiles) })
   });
   closeModal('modal-answer');
   loadDoubts();
@@ -176,7 +213,7 @@ async function loadStudents() {
       <td>${s.joined_date || ''}</td>
       <td>
         <button class="action-btn" onclick="openEditStudent(${s.id}, ${JSON.stringify(s).replace(/"/g, '&quot;')})">✏️</button>
-        <button class="action-btn del" data-delete-id="${s.id}">🗑️</button>
+        <button class="action-btn del" onclick="deleteStudent(${s.id})">🗑️</button>
       </td>
     </tr>`;
   }).join('');
@@ -253,19 +290,9 @@ async function saveStudent() {
 }
 
 async function deleteStudent(id) {
-  if (!confirm('Delete this student? This cannot be undone.')) return;
-  try {
-    const res = await fetch(`/api/teacher/students/${id}`, { method: 'DELETE' });
-    const d = await res.json();
-    if (d.success) {
-      await loadStudents();
-      await loadDashboard();
-    } else {
-      alert('Delete failed: ' + (d.error || 'Unknown error'));
-    }
-  } catch (e) {
-    alert('Delete failed: network error. Please try again.');
-  }
+  if (!confirm('Delete this student?')) return;
+  await fetch(`/api/teacher/students/${id}`, { method: 'DELETE' });
+  loadStudents(); loadDashboard();
 }
 
 // ─── TASKS ───
