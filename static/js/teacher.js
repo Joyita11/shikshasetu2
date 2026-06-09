@@ -78,6 +78,7 @@ async function loadDashboard() {
 
 // ─── DOUBTS ───
 let currentDoubtId = null;
+const _doubtsMap = {};  // id → question, avoids inline string escaping issues
 
 async function loadDoubts() {
   const res = await fetch('/api/teacher/doubts');
@@ -87,12 +88,13 @@ async function loadDoubts() {
     container.innerHTML = '<div style="text-align:center;padding:40px;color:#666">No doubts yet.</div>';
     return;
   }
+  doubts.forEach(d => { _doubtsMap[d.id] = d.question; });
   container.innerHTML = doubts.map(d => {
     const initials = d.student_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     const date = new Date(d.created_at).toLocaleString();
     const badge = d.status === 'solved'
       ? '<span class="badge-solved">Solved</span>'
-      : `<button class="btn-dark" style="font-size:13px;padding:8px 16px" onclick="openAnswerModal(${d.id}, '${escHtml(d.question)}')">Answer</button>`;
+      : `<button class="btn-dark" style="font-size:13px;padding:8px 16px" onclick="openAnswerModal(${d.id})">Answer</button>`;
     let answerBlock = '';
     if (d.answer || d.answer_files) {
       let filesHtml = '';
@@ -133,9 +135,10 @@ async function loadDoubts() {
 
 let answerFiles = [];  // [{name, data}, ...] for the current answer modal
 
-function openAnswerModal(id, question) {
+function openAnswerModal(id) {
   currentDoubtId = id;
   answerFiles = [];
+  const question = _doubtsMap[id] || '';
   document.getElementById('doubt-question-display').textContent = `"${question}"`;
   document.getElementById('doubt-answer').value = '';
   document.getElementById('answer-files-list').innerHTML = '';
