@@ -109,7 +109,7 @@ async function loadDoubts() {
                 </a>`;
               }).join('') + `</div>`;
           }
-        } catch (e) { }
+        } catch(e) {}
       }
       answerBlock = `<div class="doubt-answer"><strong>Your Answer:</strong> ${d.answer ? escHtml(d.answer) : '<em style="color:var(--ink-3)">See attached file(s)</em>'}${filesHtml}</div>`;
     }
@@ -251,7 +251,6 @@ function openEditStudent(id, data) {
 async function saveStudent() {
   const err = document.getElementById('modal-err');
   err.textContent = '';
-  err.style.display = 'none';
   const name = document.getElementById('s-name').value.trim();
   const password = document.getElementById('s-password').value.trim();
   const cls = document.getElementById('s-class').value.trim();
@@ -260,7 +259,7 @@ async function saveStudent() {
   const fees = document.getElementById('s-fees').value;
   const joinedDate = document.getElementById('s-joined-date').value;  // YYYY-MM-DD
 
-  if (!name) { err.textContent = 'Student name is required.'; err.style.display = 'block'; return; }
+  if (!name) { err.textContent = 'Student name is required.'; return; }
 
   if (editStudentId) {
     const res = await fetch(`/api/teacher/students/${editStudentId}`, {
@@ -270,7 +269,7 @@ async function saveStudent() {
     });
     const d = await res.json();
     if (d.success) { closeModal('modal-add-student'); loadStudents(); }
-    else { err.textContent = d.error || 'Failed.'; err.style.display = 'block'; }
+    else err.textContent = d.error || 'Failed.';
   } else {
     const res = await fetch('/api/teacher/students', {
       method: 'POST',
@@ -285,19 +284,15 @@ async function saveStudent() {
       loadStudents();
       loadDashboard();
     } else {
-      err.textContent = d.error || 'Failed.'; err.style.display = 'block';
+      err.textContent = d.error || 'Failed.';
     }
   }
 }
 
 async function deleteStudent(id) {
-  if (!confirm('Delete this student? This cannot be undone.')) return;
-  try {
-    const res = await fetch(`/api/teacher/students/${id}`, { method: 'DELETE' });
-    const d = await res.json();
-    if (d.success) { await loadStudents(); await loadDashboard(); }
-    else alert('Delete failed: ' + (d.error || 'Unknown error'));
-  } catch (e) { alert('Delete failed: network error.'); }
+  if (!confirm('Delete this student?')) return;
+  await fetch(`/api/teacher/students/${id}`, { method: 'DELETE' });
+  loadStudents(); loadDashboard();
 }
 
 // ─── TASKS ───
