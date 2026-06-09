@@ -435,9 +435,22 @@ def answer_doubt(did):
     conn = get_db()
     c = conn.cursor()
     answer_files = data.get('answer_files', '')  # JSON string: [{name, data}, ...]
-    c.execute("UPDATE doubts SET answer=?, answer_files=?, status='solved' WHERE id=? AND teacher_id=?",
-              (data.get('answer', ''), answer_files, did, uid))
-    conn.commit()
+
+    # Ensure answer_files column exists (safe migration for older deployed DBs)
+    try:
+        c.execute('ALTER TABLE doubts ADD COLUMN answer_files TEXT DEFAULT ""')
+        conn.commit()
+    except Exception:
+        pass  # Column already exists — that's fine
+
+    try:
+        c.execute("UPDATE doubts SET answer=?, answer_files=?, status='solved' WHERE id=? AND teacher_id=?",
+                  (data.get('answer', ''), answer_files, did, uid))
+        conn.commit()
+    except Exception as e:
+        conn.close()
+        return jsonify({'error': str(e)}), 500
+
     conn.close()
     return jsonify({'success': True})
 
